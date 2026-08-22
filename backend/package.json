@@ -1,0 +1,28 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "grok-sdk": "^0.0.1-security",
+    "jsonwebtoken": "^9.0.3",
+    "mongodb": "^7.5.0",
+    "mongoose": "^9.9.3",
+    "multer": "^2.2.0",
+    "nodemon": "^3.1.14",
+    "pdf-parse": "^2.4.5",
+    "pdfjs-dist": "^6.2.108"
+  }
+}
