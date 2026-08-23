@@ -125,7 +125,7 @@ const page = () => {
               </Button>
 
               <p className="text-sm text-muted-foreground text-center">
-                Don&apos;t have an account?{" "}
+                Don't have an account?{" "}
                 <Link
                   href="/register"
                   className="text-primary font-medium hover:underline"
