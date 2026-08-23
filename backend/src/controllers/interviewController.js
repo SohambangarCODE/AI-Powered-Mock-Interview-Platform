@@ -1,6 +1,5 @@
 const Groq = require("groq-sdk");
 const Interview = require("../models/interview");
-const User = require("../models/user");
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,

@@ -1,16 +1,24 @@
 const express = require('express');
 const mongoose = require('mongoose');
+require('dotenv').config(); 
 const cors = require('cors');
 const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
-require('dotenv').config(); 
+const interviewRoutes = require('./routes/interviewRoutes');
+const resumeRoutes = require('./routes/resumeRoutes');
+
 
 const app = express();
 
 connectDB();
-app.use('/api/auth', authRoutes);
 
-app.use(cors());
+app.use('/api/auth', authRoutes);
+app.use('/api/interviews', interviewRoutes);
+app.use('/api/resume', resumeRoutes);
+
+app.use(cors({
+    origin: "*",
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); 
 

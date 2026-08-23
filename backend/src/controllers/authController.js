@@ -1,5 +1,9 @@
 const user = require("../models/userModel");
 
+const signToken = (userID) => {
+  jwt.sign({userID }, process.env.JWT_SECRET, { expiresIn: "1d" });
+  }
+
 const registerUser = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -14,6 +18,7 @@ const registerUser = async (req, res) => {
     }
 
     const newUser = new user({ name, email, password });
+    const token = signToken( newUser._id);
     await newUser.save();
 
     res
@@ -21,6 +26,7 @@ const registerUser = async (req, res) => {
       .json({
         message: "User registered successfully",
         user: { id: newUser._id, name: newUser.name, email: newUser.email },
+        token,
       });
   } catch (error) {
     console.error("Error registering user:", error);
@@ -46,7 +52,7 @@ const loginUser = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    res.status(200).json({ message: "User logged in successfully", user: { id: existingUser._id, name: existingUser.name, email: existingUser.email } });
+    res.status(200).json({ message: "User logged in successfully", user: { id: existingUser._id, name: existingUser.name, email: existingUser.email }, token: signToken(existingUser._id).toString() });
   } catch (error) {
     console.error("Error logging in user:", error);
     res.status(500).json({ message: error.message });
