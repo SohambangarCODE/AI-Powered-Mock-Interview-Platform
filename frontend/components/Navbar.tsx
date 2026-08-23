@@ -28,7 +28,7 @@ function Navbar() {
     _id: "1",
   }; // Replace with your actual user data
 
-  const isLoggedIn = true; // Replace with your actual authentication logic
+  const isLoggedIn = false; // Replace with your actual authentication logic
   const logout = () => {};
 
   useEffect(() => {
