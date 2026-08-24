@@ -1,34 +1,48 @@
 "use client";
 
-import { clearAuth, getStoredUser, setStoredUser, setToken } from "@/lib/auth";
-import { getToken } from "@/lib/auth";
-import { createContext, useCallback, useEffect, useState } from "react";
-import axios from "axios";
-import router from "next/dist/shared/lib/router/router";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
+import axiosInstance from "@/lib/axios";
+import {
+  clearAuth,
+  getStoredUser,
+  getToken,
+  setStoredUser,
+  setToken,
+  StoredUser,
+} from "@/lib/auth";
 
-interface authContextType {
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    createdAt: string;
-  } | null;
+// ── Types ─────────────────────────────────────────────────
+interface AuthContextValue {
+  user: StoredUser | null;
+  token: string | null;
+  isLoading: boolean;
+  isLoggedIn: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
-  isLoggedIn: boolean;
-  refreshUser: () => void;
+  refreshUser: () => Promise<void>;
 }
 
-const AuthContext = createContext<authContextType | null>(null);
+// ── Context ───────────────────────────────────────────────
+const AuthContext = createContext<AuthContextValue | null>(null);
 
+// ── Provider ──────────────────────────────────────────────
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<authContextType["user"]>(null);
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
-  const [token, setTokenState] = useState<string | null>(null);
   const router = useRouter();
 
+  const [user, setUser] = useState<StoredUser | null>(null);
+  const [token, setTokenState] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true); // true on first load
+
+  // Hydrate from localStorage on mount
   useEffect(() => {
     const storedToken = getToken();
     const storedUser = getStoredUser();
@@ -38,89 +52,92 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(storedUser);
     }
 
-    setIsLoggedIn(false);
+    setIsLoading(false);
   }, []);
 
+  // ── Login ───────────────────────────────────────────────
   const login = useCallback(
     async (email: string, password: string) => {
-      setIsLoggedIn(true);
+      setIsLoading(true);
       try {
-        const { data } = await axios.post("/api/auth/login", {
+        const { data } = await axiosInstance.post("/api/auth/login", {
           email,
           password,
         });
-        const { token, user } = data;
-        setTokenState(token);
-        setToken(token);
-        setUser(user);
-        setStoredUser(user);
-        setIsLoggedIn(true);
+
+        setToken(data.token);
+        setStoredUser(data.user);
+        setTokenState(data.token);
+        setUser(data.user);
+
         router.push("/dashboard");
-      } catch (error) {
-        console.error("Login failed:", error);
-        setIsLoggedIn(false);
       } finally {
-        setIsLoggedIn(false);
+        setIsLoading(false);
       }
     },
     [router],
   );
 
+  // ── Register ────────────────────────────────────────────
   const register = useCallback(
     async (name: string, email: string, password: string) => {
-      setIsLoggedIn(true);
+      setIsLoading(true);
       try {
-        const { data } = await axios.post("/api/auth/register", {
+        const { data } = await axiosInstance.post("/api/auth/register", {
           name,
           email,
           password,
         });
-        const { token, user } = data;
-        setTokenState(token);
-        setToken(token);
-        setUser(user);
-        setStoredUser(user);
-        setIsLoggedIn(true);
+
+        setToken(data.token);
+        setStoredUser(data.user);
+        setTokenState(data.token);
+        setUser(data.user);
+
         router.push("/dashboard");
-      } catch (error) {
-        console.error("Registration failed:", error);
-        setIsLoggedIn(false);
       } finally {
-        setIsLoggedIn(false);
+        setIsLoading(false);
       }
     },
     [router],
   );
 
+  // ── Logout ──────────────────────────────────────────────
   const logout = useCallback(() => {
+    clearAuth();
     setTokenState(null);
     setUser(null);
-    setIsLoggedIn(false);
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    clearAuth();
-    router.push("/login");
+    router.push("/");
   }, [router]);
 
+  // ── Refresh user from API ───────────────────────────────
   const refreshUser = useCallback(async () => {
-    if (!token) return;
     try {
-      const { data } = await axios.get("/api/auth/me");
-      setUser(data.user);
+      const { data } = await axiosInstance.get("/api/auth/me");
       setStoredUser(data.user);
-    } catch (error) {
-      console.error("Failed to refresh user:", error);
+      setUser(data.user);
+    } catch {
+      // token invalid — log out
       logout();
     }
   }, [logout]);
 
-  return (
-    <AuthContext.Provider
-      value={{ user, login, register, logout, isLoggedIn, refreshUser }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user,
+      token,
+      isLoading,
+      isLoggedIn: !!token && !!user,
+      login,
+      register,
+      logout,
+      refreshUser,
+    }),
+    [user, token, isLoading, login, register, logout, refreshUser],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-module.exports = { AuthContext, AuthProvider };
+// ── Raw context export (used by useAuth hook) ─────────────
+export { AuthContext };
