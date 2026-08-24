@@ -1,9 +1,10 @@
 "use client";
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Menu,
   X,
@@ -17,19 +18,12 @@ import {
 
 function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, isLoggedIn, logout } = useAuth();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-
-  const user = {
-    name: "John Doe",
-    email: "john.doe@example.com",
-    createdAt: "2023-01-01T00:00:00Z",
-    _id: "1",
-  }; // Replace with your actual user data
-
-  const isLoggedIn = false; // Replace with your actual authentication logic
-  const logout = () => {};
+  const [activeSection, setActiveSection] = useState<string | null>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 50);
@@ -41,7 +35,54 @@ function Navbar() {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  const isActive = (path: string) => pathname === path;
+  useEffect(() => {
+    if (pathname !== "/") {
+      setActiveSection(null);
+      return;
+    }
+    const sectionIds = ["features", "how-it-works", "domains"];
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setActiveSection(entry.target.id);
+          }
+        });
+      },
+      { rootMargin: "-40% 0px -50% 0px", threshold: 0 }
+    );
+
+    const els = sectionIds
+      .map((id) => document.getElementById(id))
+      .filter((el): el is HTMLElement => Boolean(el));
+    els.forEach((el) => observer.observe(el));
+
+    return () => observer.disconnect();
+  }, [pathname]);
+
+  const isActive = (path: string) => {
+    if (path.startsWith("/#")) {
+      return pathname === "/" && activeSection === path.replace("/#", "");
+    }
+    return pathname === path;
+  };
+
+  const handleNavClick = (
+    e: React.MouseEvent<HTMLButtonElement>,
+    href: string
+  ) => {
+    if (href.startsWith("/#") && pathname === "/") {
+      e.preventDefault();
+      const id = href.replace("/#", "");
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+    
+        window.history.replaceState(null, "", href);
+      }
+    }
+    setMobileMenuOpen(false);
+  };
 
   const navLinks = isLoggedIn
     ? [
@@ -56,12 +97,12 @@ function Navbar() {
       ];
 
   const initials =
-    user.name
+    (user?.name || "U")
       .split(" ")
       .map((n) => n[0])
       .join("")
       .toUpperCase() || "U";
-  const firstName = user.name.split(" ")[0] || "User";
+  const firstName = (user?.name || "User").split(" ")[0];
 
   return (
     <nav
@@ -103,6 +144,7 @@ function Navbar() {
               return (
                 <Link key={link.href} href={link.href}>
                   <button
+                    onClick={(e) => handleNavClick(e, link.href)}
                     className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
                       isActive(link.href)
                         ? "bg-primary/10 text-primary"
@@ -183,12 +225,9 @@ function Navbar() {
           {navLinks.map((link) => {
             const Icon = link.icon;
             return (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileMenuOpen(false)}
-              >
+              <Link key={link.href} href={link.href}>
                 <button
+                  onClick={(e) => handleNavClick(e, link.href)}
                   className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
                     isActive(link.href)
                       ? "bg-primary/10 text-primary"
@@ -219,7 +258,7 @@ function Navbar() {
                       {firstName}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {user.email}
+                      {user?.email}
                     </span>
                   </div>
                 </div>

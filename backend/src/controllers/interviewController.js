@@ -22,7 +22,7 @@ const startInterview = async (req, res) => {
       return res.status(400).json({ message: "Domain is required" });
     }
     const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "groq/compound-mini",
       messages: [
         { role: "system", content: systemPrompt(domain) },
         {
@@ -49,9 +49,10 @@ const startInterview = async (req, res) => {
     });
   } catch (error) {
     console.error("Error starting interview:", error);
-    res
-      .status(500)
-      .json({ message: "Error starting interview", error: error.message });
+    if (error.response) {
+      return res.status(500).json({ message: "AI service error", error: error.message });
+    }
+    res.status(500).json({ message: "Error starting interview", error: error.message });
   }
 };
 
@@ -77,7 +78,7 @@ const submitAnswer = async (req, res) => {
 
     // 1️⃣ Generate feedback on the answer
     const feedbackResponse = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "groq/compound-mini",
       messages: [
         {
           role: "user",
@@ -118,7 +119,7 @@ Return ONLY the feedback, no additional text.`,
     // ── Complete path ──────────────────────────────────────
     if (isComplete) {
       const scoreResponse = await groq.chat.completions.create({
-        model: "llama-3.3-70b-versatile",
+        model: "groq/compound-mini",
         messages: [
           {
             role: "user",
@@ -150,7 +151,7 @@ Answer: "${answer}"`,
 
     // ── Continue path ──────────────────────────────────────
     const nextQuestionResponse = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "groq/compound-mini",
       messages: [
         {
           role: "user",
@@ -177,9 +178,10 @@ Return ONLY the new question, nothing else.`,
     return res.json({ feedback, nextQuestion, isComplete: false });
   } catch (err) {
     console.error("submitAnswer error:", err);
-    res
-      .status(500)
-      .json({ message: "Internal server error", error: err.message });
+    if (err.response) {
+      return res.status(500).json({ message: "AI service error", error: err.message });
+    }
+    res.status(500).json({ message: "Internal server error", error: err.message });
   }
 };
 

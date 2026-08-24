@@ -11,10 +11,11 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import Link from "next/link";
-import React from "react";
-import { useState } from "react";
+import React, { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 const page = () => {
+  const { register, isLoading } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -22,7 +23,6 @@ const page = () => {
     confirmPassword: "",
   });
 
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,7 +42,11 @@ const page = () => {
       return;
     }
 
-    setIsLoading(true);
+    try {
+      await register(formData.name, formData.email, formData.password);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Registration failed. Please try again.");
+    }
   };
 
   return (

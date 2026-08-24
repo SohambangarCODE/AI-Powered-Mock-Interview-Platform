@@ -85,7 +85,7 @@ const InterviewContent = () => {
       setMessages([
         {
           id: "1",
-          content: "Connection error.Please check your network",
+          content: "Connection error. Please check your network",
           isUser: false,
           timestamp: new Date(),
         },
@@ -159,6 +159,11 @@ const InterviewContent = () => {
     }
   };
   const handleEndInterview = () => router.push("/dashboard");
+
+  const handleExitConfirm = () => {
+    setShowExitConfirm(false);
+    router.push("/dashboard");
+  };
   if (authLoading) return null;
   if (!isLoggedIn) return null;
   const score = interviewScore ?? 0;
@@ -179,9 +184,9 @@ const InterviewContent = () => {
           };
   return (
     
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-[calc(100vh-4rem)] bg-background flex flex-col">
       {/* Sticky Header */}
-      <div className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-16 z-30">
+      <div className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-30">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between gap-4">
             {/* Left: Domain info */}
@@ -243,6 +248,29 @@ const InterviewContent = () => {
               </Button>
             </div>
           </div>
+          {showExitConfirm && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+              <div className="bg-white rounded-lg p-8 w-full max-w-md shadow-xl text-center">
+                <p className="text-lg font-medium mb-4">Exit Interview?</p>
+                <p className="text-muted-foreground mb-6">Are you sure you want to exit? Your progress will not be saved.</p>
+                <div className="flex gap-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowExitConfirm(false)}
+                    className="flex-1 py-3"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleExitConfirm}
+                    className="py-3 bg-destructive text-white"
+                  >
+                    Yes, Exit
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
           {!isInterviewComplete && (
             <div className="sm:hidden mt-3">
               <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">

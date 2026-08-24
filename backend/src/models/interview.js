@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 
 const messageSchema = new mongoose.Schema({
-    role: {type: String, enum: ['user', 'ai-assistant'], required: true},
+    role: {type: String, enum: ['user', 'ai'], required: true},
     content: {type: String, required: true},
     timestamp: {type: Date, default: Date.now}
 })
@@ -16,7 +16,7 @@ const interviewSchema = new mongoose.Schema({
     createdAt: {type: Date, default: Date.now},
     questionsAnswered: {type: Number, default: 0},
     feedback: {type: String, default: ''},
-    isCompleted: {type: Boolean, default: false}
+    isComplete: {type: Boolean, default: false}
 });
 
 module.exports = mongoose.model('Interview', interviewSchema);

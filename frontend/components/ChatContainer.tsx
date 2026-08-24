@@ -11,7 +11,7 @@ interface ChatContainerProps {
 }
 const ChatContainer = ({ messages, isLoading }: ChatContainerProps) => {
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50">
+    <div className="flex-1 overflow-y-auto h-[calc(100%-12rem)] p-6 space-y-4 bg-gray-50">
       {messages.length === 0 && !isLoading && (
         <div className="flex items-center justify-center h-full text-gray-500">
           <p>Start an interview to begin</p>

@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import axios from "axios";
+import axiosInstance from "@/lib/axios";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -59,13 +59,21 @@ function ResumePanel({
     "Generating recommendations…",
   ];
   const handleFile = (f: File) => {
-    const allowed = [
+    const allowedTypes = [
       "application/pdf",
       "text/plain",
       "application/msword",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ];
-    if (!allowed.includes(f.type)) {
+    // Allow file if type matches OR if filename has valid extension
+    const isTypeAllowed = allowedTypes.includes(f.type);
+    const allowedExtensions = [".pdf", ".txt", ".doc", ".docx"];
+    const fileExtension = f.name?.substring(f.name?.lastIndexOf('.') ?? 0) || '';
+    const isExtensionAllowed = allowedExtensions.some(ext =>
+      fileExtension.toLowerCase().endsWith(ext)
+    );
+    
+    if (!isTypeAllowed && !isExtensionAllowed) {
       setError("Please upload a PDF, DOC, DOCX, or TXT file.");
       return;
     }
@@ -89,18 +97,37 @@ function ResumePanel({
     }, 1100);
     try {
       const formData = new FormData();
-      formData.append("resume", file);
-      const { data } = await axios.post(
+      if (file) {
+        formData.append("resume", file);
+      }
+      const { data } = await axiosInstance.post(
         "/api/resume/analyze",
         formData,
-        {
-          headers: { "Content-Type": "multipart/form-data" },
-        },
       );
       setAnalysis(data.analysis);
       setStep("results");
     } catch (error: any) {
-      setError(error?.response?.data?.message);
+      let errorMessage: string;
+      if (error?.response?.status === 400) {
+        errorMessage = error.response.data.error || "Invalid file format or file too large.";
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.response?.status === 500) {
+        // Check for specific error messages from backend
+        const backendMsg = error?.response?.data?.error || '';
+        if (backendMsg.includes("AI service error")) {
+          errorMessage = "AI service error. Please try again later.";
+        } else if (backendMsg.includes("Failed to extract")) {
+          errorMessage = "Failed to extract text from resume.";
+        } else if (backendMsg.includes("Failed to parse")) {
+          errorMessage = "Failed to analyze resume data.";
+        } else {
+          errorMessage = "AI analysis failed. Please try again.";
+        }
+      } else {
+        errorMessage = "Connection error. Please check your network.";
+      }
+      setError(errorMessage);
       setStep("upload");
     } finally {
       clearInterval(interval);
@@ -458,7 +485,7 @@ const page = () => {
   const fetchInterviews = async () => {
     try {
       setDataLoading(true);
-      const { data } = await axios.get("/api/interviews");
+      const { data } = await axiosInstance.get("/api/interviews");
       setIntervies(data.interviews || []);
     } catch (error) {
       console.error("Failed to fetch interviews:", error);
@@ -910,6 +937,3 @@ function MiniSparkline({ scores }: { scores: number[] }) {
 }
 export default page;
 
-function useAuth(): { isLoggedIn: any; isLoading: any; user: any; } {
-    throw new Error("Function not implemented.");
-}

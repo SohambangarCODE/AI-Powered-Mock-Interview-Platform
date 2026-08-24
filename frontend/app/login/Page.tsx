@@ -11,16 +11,16 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import Link from "next/link";
-import React from "react";
-import { useState } from "react";
+import React, { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 const page = () => {
+  const { login, isLoading } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
 
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,8 +33,13 @@ const page = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsLoading(true);
     setError("");
+
+    try {
+      await login(formData.email, formData.password);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Login failed. Please try again.");
+    }
   };
 
   return (

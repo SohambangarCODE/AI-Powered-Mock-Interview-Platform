@@ -12,15 +12,16 @@ const app = express();
 
 connectDB();
 
-app.use('/api/auth', authRoutes);
-app.use('/api/interviews', interviewRoutes);
-app.use('/api/resume', resumeRoutes);
 
 app.use(cors({
     origin: "*",
 }));
 app.use(express.json());
-app.use(express.urlencoded({ extended: true })); 
+app.use(express.urlencoded({ extended: true }));
+
+app.use('/api/auth', authRoutes);
+app.use('/api/interviews', interviewRoutes);
+app.use('/api/resume', resumeRoutes);
 
 const PORT = process.env.PORT || 5000;
 
