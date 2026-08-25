@@ -82,10 +82,18 @@ const InterviewContent = () => {
         ]);
       }
     } catch (error) {
+      let errorMessage: string;
+      if ((error as any)?.response?.status === 500) {
+        errorMessage = "AI service error. Please try again.";
+      } else if ((error as any)?.response?.status === 401) {
+        errorMessage = "Authorization error. Please log in again.";
+      } else {
+        errorMessage = "Connection error. Please check your network.";
+      }
       setMessages([
         {
           id: "1",
-          content: "Connection error. Please check your network",
+          content: errorMessage,
           isUser: false,
           timestamp: new Date(),
         },
@@ -145,11 +153,19 @@ const InterviewContent = () => {
         }
       }
     } catch (error) {
+      let errorMessage: string;
+      if ((error as any)?.response?.status === 500) {
+        errorMessage = "AI service error. Please try again.";
+      } else if ((error as any)?.response?.status === 401) {
+        errorMessage = "Authorization error. Please log in again.";
+      } else {
+        errorMessage = "Connection error. Please check your network.";
+      }
       setMessages((prev) => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
-          content: "Connection error. Please try again",
+          content: errorMessage,
           isUser: false,
           timestamp: new Date(),
         },

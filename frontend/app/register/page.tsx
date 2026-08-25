@@ -45,7 +45,16 @@ const page = () => {
     try {
       await register(formData.name, formData.email, formData.password);
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Registration failed. Please try again.");
+      // Specific error messages from backend
+      if (err?.response?.data?.message) {
+        setError(err.response.data.message);
+      } else if (err?.response?.status === 400) {
+        setError("Registration failed. Please check the form and try again.");
+      } else if (err?.response?.status === 500) {
+        setError("Server error. Please try again later.");
+      } else {
+        setError("Connection error. Please check your network.");
+      }
     }
   };
 
