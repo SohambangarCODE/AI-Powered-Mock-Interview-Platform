@@ -1,198 +1,306 @@
-const Groq = require("groq-sdk");
 const Interview = require("../models/interview");
+const { isRepeatedAnswer } = require("../utils/textUtils");
+const {
+  MIN_QUESTIONS,
+  MAX_QUESTIONS,
+  generateOpeningQuestion,
+  requestNextStep,
+  buildReport,
+} = require("../utils/interviewEngine");
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+const minutesSince = (date) =>
+  Math.max(1, Math.round((Date.now() - new Date(date).getTime()) / 60000));
 
-const systemPrompt = (domain) =>
-  `
-You are a senior technical interviewer conducting a mock interview for a ${domain} developer role.
-Ask one clear, specific technical question at a time.
-After the candidate answers, provide feedback and the next question.
-
-Return ONLY the question, nothing else.
-
-`.trim();
-
+// ── Start Interview ───────────────────────────────────────
 const startInterview = async (req, res) => {
   try {
     const { domain } = req.body;
-    if (!domain) {
-      return res.status(400).json({ message: "Domain is required" });
-    }
-    const completion = await groq.chat.completions.create({
-      model: "groq/compound-mini",
-      messages: [
-        { role: "system", content: systemPrompt(domain) },
-        {
-          role: "user",
-          content: `Start the interview. Ask me the first ${domain} technical question. Only ask the question, no preamble.`,
-        },
-      ],
-      temperature: 0.7,
-    });
+    if (!domain) return res.status(400).json({ message: "Domain is required" });
 
-    const firstQuestion =
-      completion.choices[0].message.content ||
-      "Tell me about yourself and your experience.";
+    const { question, topic, difficulty } = await generateOpeningQuestion(domain);
 
     const interview = await Interview.create({
       userId: req.userId,
       domain,
-      messages: [{ role: "ai", content: firstQuestion }],
+      currentDifficulty: difficulty,
+      askedTopics: [topic],
+      turns: [{ index: 1, topic, difficulty, question }],
+      messages: [
+        { role: "ai", kind: "question", content: question, difficulty, topic },
+      ],
     });
 
     res.status(201).json({
       sessionId: interview._id,
-      question: firstQuestion,
+      question,
+      difficulty,
+      topic,
+      turnIndex: 1,
+      answeredCount: 0,
+      skippedCount: 0,
+      minQuestions: MIN_QUESTIONS,
+      maxQuestions: MAX_QUESTIONS,
     });
   } catch (error) {
     console.error("Error starting interview:", error);
-    if (error.response) {
-      return res.status(500).json({ message: "AI service error", error: error.message });
-    }
-    res.status(500).json({ message: "Error starting interview", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error starting interview", error: error.message });
   }
 };
 
-// ── Submit Answer ─────────────────────────────────────────
+// ── Submit Answer (core adaptive loop) ─────────────────────
 const submitAnswer = async (req, res) => {
   try {
-    const {
-      sessionId,
-      answer,
-      domain = "General",
-      questionsAnswered = 0,
-    } = req.body;
+    const { sessionId, answer, skipped = false } = req.body;
+    const trimmed = typeof answer === "string" ? answer.trim() : "";
 
-    if (!sessionId || !answer)
-      return res.status(400).json({ message: "Missing required fields" });
+    if (!sessionId)
+      return res.status(400).json({ message: "sessionId is required" });
+    if (!skipped && !trimmed)
+      return res.status(400).json({ message: "An answer is required" });
 
     const interview = await Interview.findOne({
       _id: sessionId,
       userId: req.userId,
+      isComplete: false,
     });
     if (!interview)
-      return res.status(404).json({ message: "Session not found" });
+      return res
+        .status(404)
+        .json({ message: "Session not found or already complete" });
 
-    // 1️⃣ Generate feedback on the answer
-    const feedbackResponse = await groq.chat.completions.create({
-      model: "groq/compound-mini",
-      messages: [
-        {
-          role: "user",
-          content: `You are an expert ${domain} interview evaluator.
-Provide constructive feedback on this interview answer in 2-3 sentences.
-Focus on:
-- Clarity and structure of the response
-- Technical accuracy and depth
-- Communication skills
-- Areas for improvement
+    const openTurn = interview.openTurn();
+    if (!openTurn)
+      return res
+        .status(409)
+        .json({ message: "No question is awaiting an answer" });
 
-Answer: "${answer}"
+    // ── Repeated answer — nudge, don't spend an AI call or a turn ──
+    if (!skipped && isRepeatedAnswer(trimmed, interview.previousAnswers())) {
+      const nudge =
+        "That's essentially the same as an answer you've already given. Could you elaborate, or add more technical detail?";
 
-Return ONLY the feedback, no additional text.`,
-        },
-      ],
-      temperature: 0.7,
-      max_tokens: 200,
-    });
+      interview.messages.push({ role: "user", kind: "answer", content: trimmed });
+      interview.messages.push({
+        role: "ai",
+        kind: "nudge",
+        content: nudge,
+        topic: openTurn.topic,
+        difficulty: openTurn.difficulty,
+      });
+      interview.lastActivityAt = new Date();
+      await interview.save();
 
-    const feedback = feedbackResponse.choices[0].message.content.trim();
+      return res.json({
+        repeated: true,
+        feedback: nudge,
+        // The open turn's own question — not "the last ai message", which after
+        // a nudge would hand back the nudge text itself.
+        nextQuestion: openTurn.question,
+        topic: openTurn.topic,
+        difficulty: interview.currentDifficulty,
+        turnIndex: openTurn.index,
+        answeredCount: interview.questionsAnswered,
+        skippedCount: interview.skippedCount,
+        isComplete: false,
+      });
+    }
 
-    const isComplete = questionsAnswered >= 2; // complete after 3 questions (0, 1, 2)
+    const answerText = skipped ? "[The candidate skipped this question]" : trimmed;
 
-    // 2️⃣ Save messages to DB
+    // The AI call happens BEFORE any mutation, so a Groq failure can't leave the
+    // transcript holding an answer with no feedback or follow-up question.
+    const decision = await requestNextStep({ interview, answerText, skipped });
+
+    // ── Commit the turn ───────────────────────────────────
+    openTurn.answer = skipped ? "" : trimmed;
+    openTurn.skipped = skipped;
+    openTurn.score = skipped ? null : decision.score;
+    openTurn.feedback = decision.feedback;
+    openTurn.answeredAt = new Date();
+
     interview.messages.push({
       role: "user",
-      content: answer,
-      timestamp: new Date(),
+      kind: "answer",
+      content: skipped ? "[Question skipped]" : trimmed,
+      skipped,
+      topic: openTurn.topic,
+      difficulty: openTurn.difficulty,
+      score: openTurn.score,
     });
     interview.messages.push({
       role: "ai",
-      content: feedback,
-      timestamp: new Date(),
+      kind: "feedback",
+      content: decision.feedback,
+      topic: openTurn.topic,
+      difficulty: openTurn.difficulty,
+      score: openTurn.score,
     });
-    interview.questionsAnswered = questionsAnswered + 1;
 
-    // ── Complete path ──────────────────────────────────────
-    if (isComplete) {
-      const scoreResponse = await groq.chat.completions.create({
-        model: "groq/compound-mini",
-        messages: [
-          {
-            role: "user",
-            content: `Rate this interview answer on a scale of 1-100 for a ${domain} position.
-Consider technical accuracy, communication, and problem-solving.
-Return ONLY a number between 10-100, nothing else.
-Answer: "${answer}"`,
-          },
-        ],
-        temperature: 0.5,
-        max_tokens: 10,
-      });
+    if (skipped) interview.skippedCount += 1;
+    else interview.questionsAnswered += 1;
 
-      const scoreRaw = scoreResponse.choices[0].message.content.trim();
-      const score = Math.max(10, Math.min(100, parseInt(scoreRaw) || 75));
+    interview.currentDifficulty = decision.nextDifficulty;
+    interview.lastActivityAt = new Date();
 
-      interview.score = score;
+    // ── Complete ──────────────────────────────────────────
+    if (decision.shouldEnd) {
+      const report = await buildReport(interview);
+
       interview.isComplete = true;
-      interview.feedback = feedback;
-      interview.duration = Math.max(
-        1,
-        Math.round((Date.now() - interview.createdAt.getTime()) / 60000),
-      );
-
+      interview.feedback = decision.feedback;
+      interview.score = report.overallScore;
+      interview.report = report;
+      interview.endReason = decision.endReason || "Interview complete";
+      interview.duration = minutesSince(interview.createdAt);
       await interview.save();
 
-      return res.json({ feedback, score, isComplete: true });
+      return res.json({
+        score: openTurn.score,
+        feedback: decision.feedback,
+        difficulty: decision.nextDifficulty,
+        answeredCount: interview.questionsAnswered,
+        skippedCount: interview.skippedCount,
+        isComplete: true,
+        overallScore: report.overallScore,
+        report,
+        endReason: interview.endReason,
+      });
     }
 
-    // ── Continue path ──────────────────────────────────────
-    const nextQuestionResponse = await groq.chat.completions.create({
-      model: "groq/compound-mini",
-      messages: [
-        {
-          role: "user",
-          content: `You are an expert ${domain} interviewer. Generate the NEXT interview question based on the previous answer.
-The question should:
-- Be different from typical generic interview questions
-- Build on topics relevant to ${domain}
-- Be open-ended and professional
-- Test deeper understanding of the domain
-
-Previous answer context: "${answer.substring(0, 100)}..."
-
-Return ONLY the new question, nothing else.`,
-        },
-      ],
-      temperature: 0.7,
-      max_tokens: 150,
+    // ── Next question ─────────────────────────────────────
+    const nextIndex = interview.turns.length + 1;
+    interview.turns.push({
+      index: nextIndex,
+      topic: decision.nextTopic,
+      difficulty: decision.nextDifficulty,
+      question: decision.nextQuestion,
     });
-
-    const nextQuestion = nextQuestionResponse.choices[0].message.content.trim();
+    interview.askedTopics.push(decision.nextTopic);
+    interview.messages.push({
+      role: "ai",
+      kind: "question",
+      content: decision.nextQuestion,
+      difficulty: decision.nextDifficulty,
+      topic: decision.nextTopic,
+    });
 
     await interview.save();
 
-    return res.json({ feedback, nextQuestion, isComplete: false });
+    return res.json({
+      score: openTurn.score,
+      feedback: decision.feedback,
+      nextQuestion: decision.nextQuestion,
+      difficulty: decision.nextDifficulty,
+      difficultyChange: decision.decision,
+      topic: decision.nextTopic,
+      turnIndex: nextIndex,
+      answeredCount: interview.questionsAnswered,
+      skippedCount: interview.skippedCount,
+      isComplete: false,
+      skipped,
+    });
   } catch (err) {
+    // Two answers submitted for the same session at once — the second lost the
+    // race against the first's array writes.
+    if (err.name === "VersionError")
+      return res
+        .status(409)
+        .json({ message: "That answer collided with another. Please retry." });
+
     console.error("submitAnswer error:", err);
-    if (err.response) {
-      return res.status(500).json({ message: "AI service error", error: err.message });
-    }
     res.status(500).json({ message: "Internal server error", error: err.message });
+  }
+};
+
+// ── End early and grade what exists ───────────────────────
+const finishInterview = async (req, res) => {
+  try {
+    const interview = await Interview.findOne({
+      _id: req.params.id,
+      userId: req.userId,
+    });
+    if (!interview)
+      return res.status(404).json({ message: "Interview not found" });
+
+    if (interview.isComplete)
+      return res.json({
+        isComplete: true,
+        overallScore: interview.score,
+        report: interview.report,
+        endReason: interview.endReason,
+      });
+
+    const answered = interview.turns.filter((t) => t.answeredAt);
+
+    // Nothing to grade — a report over zero answers is noise, so drop the
+    // session instead of leaving a dead row in the user's history.
+    if (answered.length === 0) {
+      await interview.deleteOne();
+      return res.json({ discarded: true, isComplete: false });
+    }
+
+    const report = await buildReport(interview);
+
+    interview.isComplete = true;
+    interview.score = report.overallScore;
+    interview.report = report;
+    interview.endReason = "Ended early by candidate";
+    interview.duration = minutesSince(interview.createdAt);
+    interview.lastActivityAt = new Date();
+    await interview.save();
+
+    res.json({
+      isComplete: true,
+      overallScore: report.overallScore,
+      report,
+      endReason: interview.endReason,
+    });
+  } catch (err) {
+    console.error("finishInterview error:", err);
+    res.status(500).json({ message: "Failed to finish interview", error: err.message });
+  }
+};
+
+// ── In-progress sessions (for "continue where you left off") ─
+const getActiveInterviews = async (req, res) => {
+  try {
+    const interviews = await Interview.find({
+      userId: req.userId,
+      isComplete: false,
+    })
+      .select("domain currentDifficulty questionsAnswered skippedCount turns lastActivityAt createdAt")
+      .sort({ lastActivityAt: -1 })
+      .limit(5);
+
+    const active = interviews
+      // A session with no answers yet is just an abandoned click — not worth
+      // offering back to the user.
+      .filter((i) => i.questionsAnswered > 0 || i.skippedCount > 0)
+      .map((i) => ({
+        id: i._id,
+        domain: i.domain,
+        currentDifficulty: i.currentDifficulty,
+        answeredCount: i.questionsAnswered,
+        skippedCount: i.skippedCount,
+        turnIndex: i.turns.length,
+        lastActivityAt: i.lastActivityAt || i.createdAt,
+      }));
+
+    res.json({ active });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Failed to fetch active sessions", error: err.message });
   }
 };
 
 // ── Get All Completed Interviews ──────────────────────────
 const getInterviews = async (req, res) => {
   try {
-    const interviews = await Interview.find({
-      userId: req.userId,
-      isComplete: true,
-    })
-      .select("domain score duration questionsAnswered createdAt")
+    const interviews = await Interview.find({ userId: req.userId, isComplete: true })
+      .select("domain score duration questionsAnswered skippedCount createdAt currentDifficulty report")
       .sort({ createdAt: -1 });
 
     const mapped = interviews.map((i) => ({
@@ -201,13 +309,15 @@ const getInterviews = async (req, res) => {
       score: i.score,
       duration: i.duration,
       date: i.createdAt,
+      finalDifficulty: i.currentDifficulty,
+      questionsAnswered: i.questionsAnswered,
+      skippedCount: i.skippedCount,
+      averageAnswerScore: i.report?.averageAnswerScore ?? null,
     }));
 
     res.json({ interviews: mapped });
   } catch (err) {
-    res
-      .status(500)
-      .json({ message: "Failed to fetch interviews", error: err.message });
+    res.status(500).json({ message: "Failed to fetch interviews", error: err.message });
   }
 };
 
@@ -220,10 +330,38 @@ const getInterview = async (req, res) => {
     });
     if (!interview)
       return res.status(404).json({ message: "Interview not found" });
-    res.json({ interview });
+
+    res.json({
+      interview,
+      meta: { minQuestions: MIN_QUESTIONS, maxQuestions: MAX_QUESTIONS },
+    });
   } catch (err) {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
 
-module.exports = { startInterview, submitAnswer, getInterviews, getInterview };
+// ── Discard a session ─────────────────────────────────────
+const deleteInterview = async (req, res) => {
+  try {
+    const result = await Interview.deleteOne({
+      _id: req.params.id,
+      userId: req.userId,
+    });
+    if (result.deletedCount === 0)
+      return res.status(404).json({ message: "Interview not found" });
+
+    res.json({ deleted: true });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to delete interview", error: err.message });
+  }
+};
+
+module.exports = {
+  startInterview,
+  submitAnswer,
+  finishInterview,
+  getActiveInterviews,
+  getInterviews,
+  getInterview,
+  deleteInterview,
+};

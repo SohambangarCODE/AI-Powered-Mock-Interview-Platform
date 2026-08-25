@@ -4,16 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import axiosInstance from "@/lib/axios";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  INTERVIEW_DOMAINS,
+  difficultyMeta,
+  domainIcon,
+  formatDate,
+  formatMinutes,
+  formatRelative,
+  scoreTone,
+  type ActiveSession,
+  type InterviewSummary,
+} from "@/lib/interview";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-
-interface Interview {
-  id: string;
-  date: string;
-  score: number;
-  duration: number;
-  topic: string;
-}
 
 interface ResumeAnalysis {
   summary: string;
@@ -22,21 +25,6 @@ interface ResumeAnalysis {
   experienceLevel: "Junior" | "Mid" | "Senior";
   skillsDetected: string[];
 }
-
-const INTERVIEW_DOMAINS = [
-  {
-    label: "JavaScript/Node.js",
-    icon: "🟨",
-    desc: "ES6+, async, Node runtime",
-  },
-  { label: "React", icon: "⚛️", desc: "Hooks, state, lifecycle" },
-  { label: "Python", icon: "🐍", desc: "OOP, data structures, stdlib" },
-  { label: "Data Science", icon: "📊", desc: "ML, pandas, statistics" },
-  { label: "DevOps", icon: "⚙️", desc: "CI/CD, Docker, Kubernetes" },
-  { label: "System Design", icon: "🏗️", desc: "Scalability, architecture" },
-  { label: "Database Design", icon: "🗄️", desc: "SQL, NoSQL, indexing" },
-  { label: "General", icon: "🎯", desc: "Behavioural & fundamentals" },
-];
 function ResumePanel({
   onDomainSelect,
 }: {
@@ -466,11 +454,12 @@ function ResumePanel({
 const page = () => {
   const router = useRouter();
   const { isLoggedIn, isLoading: authLoading, user } = useAuth();
-  const [interviews, setIntervies] = useState<Interview[]>([]);
+  const [interviews, setIntervies] = useState<InterviewSummary[]>([]);
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [ShowDomainSelector, setShowDomainSelector] = useState(false);
   const [hoveredDomain, setHoveredDomain] = useState<string | null>(null);
-  const [filterDomain, setFilterDomain] = useState<String>("All");
+  const [filterDomain, setFilterDomain] = useState<string>("All");
   const [activeTab, setActiveTab] = useState<"history" | "resume">("history");
 
   useEffect(() => {
@@ -485,10 +474,18 @@ const page = () => {
   const fetchInterviews = async () => {
     try {
       setDataLoading(true);
-      const { data } = await axiosInstance.get("/api/interviews");
-      setIntervies(data.interviews || []);
-    } catch (error) {
-      console.error("Failed to fetch interviews:", error);
+      // Completed history and in-progress sessions are separate endpoints;
+      // neither should block the other from rendering.
+      const [history, active] = await Promise.allSettled([
+        axiosInstance.get("/api/interviews"),
+        axiosInstance.get("/api/interviews/active"),
+      ]);
+      if (history.status === "fulfilled")
+        setIntervies(history.value.data.interviews || []);
+      else console.error("Failed to fetch interviews:", history.reason);
+
+      if (active.status === "fulfilled")
+        setActiveSessions(active.value.data.active || []);
     } finally {
       setDataLoading(false);
     }
@@ -517,7 +514,12 @@ const page = () => {
   const bestScore = interviews.length
     ? Math.max(...interviews.map((i) => i.score))
     : null;
-  const recentScores = [...interviews].slice(-6).map((i) => i.score);
+  // The API sorts newest-first, so take the newest six then flip them into
+  // chronological order for the trend line.
+  const recentScores = interviews
+    .slice(0, 6)
+    .map((i) => i.score)
+    .reverse();
   const uniqueDomains = [
     "All",
     ...Array.from(new Set(interviews.map((i) => i.topic))),
@@ -548,6 +550,57 @@ const page = () => {
             ⚡ New Interview
           </Button>
         </section>
+        {/* ── Continue where you left off ── */}
+        {activeSessions.length > 0 && (
+          <section className="space-y-2">
+            <p className="text-sm font-semibold text-foreground">
+              ▶ Continue where you left off
+            </p>
+            {activeSessions.map((session) => {
+              const diff = difficultyMeta(session.currentDifficulty);
+              return (
+                <Card
+                  key={session.id}
+                  className="p-4 border border-primary/30 bg-primary/[0.03] hover:border-primary/60 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-muted/50 border border-border/60 flex items-center justify-center text-xl flex-shrink-0">
+                      {domainIcon(session.domain)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                        <p className="text-sm font-semibold text-foreground truncate">
+                          {session.domain}
+                        </p>
+                        <span
+                          className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${diff.badge}`}
+                        >
+                          {diff.label}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        On Q{session.turnIndex} · {session.answeredCount}{" "}
+                        answered
+                        {session.skippedCount > 0 &&
+                          ` · ${session.skippedCount} skipped`}{" "}
+                        · {formatRelative(session.lastActivityAt)}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        router.push(`/interview?session=${session.id}`)
+                      }
+                      className="rounded-full text-xs bg-gradient-to-r from-primary to-accent hover:opacity-90 font-semibold flex-shrink-0"
+                    >
+                      Resume →
+                    </Button>
+                  </div>
+                </Card>
+              );
+            })}
+          </section>
+        )}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             {
@@ -728,10 +781,10 @@ const page = () => {
                 </Card>
               ) : (
                 <div>
-                  {[...filtered].reverse().map((interview) => {
-                    const meta = INTERVIEW_DOMAINS.find(
-                      (d) => d.label === interview.topic,
-                    );
+                  {/* Already newest-first from the API — no reverse. */}
+                  {filtered.map((interview) => {
+                    const diff = difficultyMeta(interview.finalDifficulty);
+                    const answerTone = scoreTone(interview.averageAnswerScore);
                     return (
                       <Card
                         key={interview.id}
@@ -739,7 +792,7 @@ const page = () => {
                       >
                         <div className="flex items-center gap-4">
                           <div className="w-11 h-11 rounded-xl bg-muted/50 border border-border/60 flex items-center justify-center text-xl flex-shrink-0 group-hover:border-primary/30 transition-colors">
-                            {meta?.icon || "🎯"}
+                            {domainIcon(interview.topic)}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -747,20 +800,26 @@ const page = () => {
                                 {interview.topic}
                               </p>
                               <ScoreBadge score={interview.score} />
+                              <span
+                                className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${diff.badge}`}
+                              >
+                                ended {diff.label.toLowerCase()}
+                              </span>
                             </div>
                             <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
+                              <span>📅 {formatDate(interview.date)}</span>
+                              <span>⏱ {formatMinutes(interview.duration)}</span>
                               <span>
-                                📅{" "}
-                                {new Date(interview.date).toLocaleDateString(
-                                  "en-IN",
-                                  {
-                                    day: "numeric",
-                                    month: "short",
-                                    year: "numeric",
-                                  },
-                                )}
+                                ✅ {interview.questionsAnswered} answered
                               </span>
-                              <span>⏱ {interview.duration} min</span>
+                              {interview.skippedCount > 0 && (
+                                <span>⏭ {interview.skippedCount} skipped</span>
+                              )}
+                              {interview.averageAnswerScore !== null && (
+                                <span className={answerTone.text}>
+                                  ⭐ {interview.averageAnswerScore}/10 avg
+                                </span>
+                              )}
                             </div>
                           </div>
                           <div className="hidden md:flex flex-col items-end gap-1 w-28">
@@ -781,16 +840,17 @@ const page = () => {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="rounded-full text-xs border-border/60 hidden sm:flex"
+                              className="rounded-full text-xs border-border/60"
+                              onClick={() =>
+                                router.push(`/interviews/${interview.id}`)
+                              }
                             >
                               Details
                             </Button>
                             <Button
                               size="sm"
                               className="rounded-full text-xs bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white"
-                              onClick={() =>
-                                handleSelectDomain(interview.topic)
-                              }
+                              onClick={() => handleSelectDomain(interview.topic)}
                             >
                               Retake
                             </Button>
