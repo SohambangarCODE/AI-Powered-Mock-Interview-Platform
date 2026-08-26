@@ -766,7 +766,6 @@ const page = () => {
                 }
                 icon={Gauge}
                 tone="primary"
-                className="border-primary/30 bg-primary/5"
               />
               <StatCard
                 label="Best Score"
