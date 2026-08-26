@@ -3,8 +3,11 @@
 import ChatContainer from "@/components/ChatContainer";
 import { InputBox } from "@/components/InputBox";
 import InterviewReport from "@/components/interview/InterviewReport";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Modal } from "@/components/ui/modal";
+import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/hooks/useAuth";
 import axiosInstance from "@/lib/axios";
 import {
@@ -22,6 +25,14 @@ import {
   type StoredMessage,
   type SubmitAnswerResponse,
 } from "@/lib/interview";
+import { cn } from "@/lib/utils";
+import {
+  ArrowRight,
+  CircleCheck,
+  LayoutDashboard,
+  RotateCcw,
+  Timer,
+} from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useRef, useState } from "react";
 
@@ -330,31 +341,36 @@ const InterviewContent = () => {
   const minTickPct = (bounds.min / bounds.max) * 100;
   const diffMeta = difficultyMeta(difficulty);
   const change = changeIndicator(difficultyChange);
+  const ChangeIcon = change.Icon;
+  const DomainIcon = domainIcon(domain);
   const durationMinutes = Math.max(1, Math.round(elapsed / 60));
 
   return (
-    <div className="h-[calc(100vh-4rem)] bg-background flex flex-col">
+    <div className="flex h-[calc(100dvh-4rem)] flex-col bg-background">
       {/* ── Header ──────────────────────────────────────── */}
-      <div className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-30">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3">
+      <div className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+        <div className="mx-auto max-w-4xl px-4 py-3 sm:px-6">
           <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 border border-primary/20 flex items-center justify-center text-xl flex-shrink-0">
-                {domainIcon(domain)}
-              </div>
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
+                <DomainIcon className="size-[18px]" aria-hidden />
+              </span>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <h1 className="text-base font-bold text-foreground truncate">
+                  <h1 className="truncate text-base font-semibold tracking-tight text-foreground">
                     {domain} Interview
                   </h1>
                   {!isComplete && (
-                    <span className="flex items-center gap-1 text-xs bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20 px-2 py-0.5 rounded-full font-medium flex-shrink-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                    <Badge variant="success" size="sm" className="shrink-0">
+                      <span
+                        className="size-1.5 animate-pulse rounded-full bg-success"
+                        aria-hidden
+                      />
                       Adaptive
-                    </span>
+                    </Badge>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground truncate">
+                <p className="truncate text-xs text-muted-foreground">
                   {isComplete
                     ? endReason || "Session complete"
                     : topic
@@ -366,21 +382,23 @@ const InterviewContent = () => {
 
             {/* Difficulty + timer */}
             {!isComplete && (
-              <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
-                <span
-                  className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium ${diffMeta.badge}`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${diffMeta.dot}`} />
+              <div className="hidden shrink-0 items-center gap-2 sm:flex">
+                <Badge variant="outline" className={diffMeta.badge}>
+                  <span
+                    className={cn("size-1.5 rounded-full", diffMeta.dot)}
+                    aria-hidden
+                  />
                   {diffMeta.label}
                   {difficultyChange && (
-                    <span className={`font-bold ${change.className}`}>
-                      {change.arrow}
-                    </span>
+                    <ChangeIcon
+                      className={cn("size-3.5", change.className)}
+                      aria-label={change.label}
+                    />
                   )}
-                </span>
-                <div className="flex items-center gap-1.5 bg-muted/50 border border-border/60 px-3 py-1 rounded-full">
-                  <span className="text-xs text-muted-foreground">⏱</span>
-                  <span className="text-sm font-mono font-semibold text-foreground tabular-nums">
+                </Badge>
+                <div className="flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1">
+                  <Timer className="size-3.5 text-muted-foreground" aria-hidden />
+                  <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
                     {formatClock(elapsed)}
                   </span>
                 </div>
@@ -393,7 +411,7 @@ const InterviewContent = () => {
               onClick={() =>
                 isComplete ? router.push("/dashboard") : setShowExit(true)
               }
-              className="rounded-full text-xs border-border/60 hover:border-destructive/50 hover:text-destructive hover:bg-destructive/5 transition-colors flex-shrink-0"
+              className="shrink-0 hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive"
             >
               {isComplete ? "Go to Dashboard" : "Exit"}
             </Button>
@@ -402,25 +420,25 @@ const InterviewContent = () => {
           {/* Adaptive progress: MIN..MAX, not a fixed quota */}
           {!isComplete && (
             <div className="mt-3">
-              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+              <div className="mb-1.5 flex items-center justify-between text-xs text-muted-foreground">
                 <span className="font-medium text-foreground">
                   Q{turnIndex}
-                  <span className="text-muted-foreground font-normal">
+                  <span className="font-normal text-muted-foreground">
                     {" "}
                     · {answeredCount} answered
                     {skippedCount > 0 && ` · ${skippedCount} skipped`}
                   </span>
                 </span>
-                <span className="sm:hidden font-mono">
+                <span className="font-mono tabular-nums sm:hidden">
                   {formatClock(elapsed)}
                 </span>
                 <span className="hidden sm:inline">
                   {bounds.min}–{bounds.max} questions, adapted to you
                 </span>
               </div>
-              <div className="relative h-1.5 bg-border rounded-full overflow-hidden">
+              <div className="relative h-1.5 overflow-hidden rounded-full bg-border">
                 <div
-                  className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-700"
+                  className="h-full rounded-full bg-primary transition-all duration-700"
                   style={{ width: `${progressPct}%` }}
                 />
                 {/* Past this mark the interview may end at any time. */}
@@ -436,59 +454,58 @@ const InterviewContent = () => {
       </div>
 
       {/* ── Exit dialog ─────────────────────────────────── */}
-      {showExit && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <Card className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-xl">
-            <p className="text-lg font-bold text-foreground mb-1">
-              Leave this interview?
-            </p>
-            <p className="text-sm text-muted-foreground mb-5">
-              You&apos;ve answered {answeredCount} question
-              {answeredCount === 1 ? "" : "s"}. Choose what happens to this
-              session.
-            </p>
-
-            <div className="space-y-2">
-              <ExitOption
-                title="End & get my report"
-                detail="Grades the questions you answered and closes the session."
-                onClick={endAndGrade}
-                busy={exitBusy === "end"}
-                disabled={exitBusy !== null || answeredCount + skippedCount === 0}
-              />
-              <ExitOption
-                title="Save & resume later"
-                detail="Keeps your progress. Pick it back up from the dashboard."
-                onClick={() => router.push("/dashboard")}
-                disabled={exitBusy !== null}
-              />
-              <ExitOption
-                title="Discard this session"
-                detail="Deletes it permanently. Nothing is saved to your history."
-                onClick={discardSession}
-                busy={exitBusy === "discard"}
-                disabled={exitBusy !== null}
-                destructive
-              />
-            </div>
-
-            <Button
-              variant="ghost"
-              onClick={() => setShowExit(false)}
-              disabled={exitBusy !== null}
-              className="w-full mt-3 rounded-full text-sm"
-            >
-              Keep going
-            </Button>
-          </Card>
+      <Modal
+        open={showExit}
+        // Escape / overlay click must not abandon an in-flight request.
+        onOpenChange={(next) => {
+          if (!next && exitBusy !== null) return;
+          setShowExit(next);
+        }}
+        title="Leave this interview?"
+        description={`You've answered ${answeredCount} question${
+          answeredCount === 1 ? "" : "s"
+        }. Choose what happens to this session.`}
+        className="max-w-md"
+        footer={
+          <Button
+            variant="ghost"
+            onClick={() => setShowExit(false)}
+            disabled={exitBusy !== null}
+          >
+            Keep going
+          </Button>
+        }
+      >
+        <div className="space-y-2">
+          <ExitOption
+            title="End & get my report"
+            detail="Grades the questions you answered and closes the session."
+            onClick={endAndGrade}
+            busy={exitBusy === "end"}
+            disabled={exitBusy !== null || answeredCount + skippedCount === 0}
+          />
+          <ExitOption
+            title="Save & resume later"
+            detail="Keeps your progress. Pick it back up from the dashboard."
+            onClick={() => router.push("/dashboard")}
+            disabled={exitBusy !== null}
+          />
+          <ExitOption
+            title="Discard this session"
+            detail="Deletes it permanently. Nothing is saved to your history."
+            onClick={discardSession}
+            busy={exitBusy === "discard"}
+            disabled={exitBusy !== null}
+            destructive
+          />
         </div>
-      )}
+      </Modal>
 
       {/* ── Body ────────────────────────────────────────── */}
-      <div className="flex-1 max-w-4xl w-full mx-auto flex flex-col min-h-0">
+      <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col">
         {isComplete ? (
           <div className="flex-1 overflow-y-auto p-4 md:p-8">
-            <div className="w-full max-w-2xl mx-auto">
+            <div className="mx-auto w-full max-w-2xl">
               {report ? (
                 <InterviewReport
                   report={report}
@@ -497,39 +514,37 @@ const InterviewContent = () => {
                   endReason={endReason}
                 />
               ) : (
-                <Card className="p-8 border border-border/60 text-center">
-                  <div className="text-3xl mb-3">✅</div>
-                  <h2 className="text-xl font-bold text-foreground mb-1">
+                <Card className="items-center gap-0 p-8 text-center">
+                  <span className="mb-4 flex size-11 items-center justify-center rounded-xl bg-success/10 text-success">
+                    <CircleCheck className="size-5" aria-hidden />
+                  </span>
+                  <h2 className="text-xl font-semibold tracking-tight text-foreground">
                     Interview complete
                   </h2>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="mt-1.5 text-sm text-muted-foreground">
                     {endReason ||
                       "This session finished, but no report was generated for it."}
                   </p>
                 </Card>
               )}
 
-              <div className="grid grid-cols-2 gap-3 mt-5">
-                <Button
-                  variant="outline"
-                  onClick={retry}
-                  className="rounded-full border-border/60"
-                >
-                  🔄 New session
+              <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Button variant="outline" size="lg" onClick={retry}>
+                  <RotateCcw aria-hidden />
+                  New session
                 </Button>
-                <Button
-                  onClick={() => router.push("/dashboard")}
-                  className="rounded-full bg-gradient-to-r from-primary to-accent hover:opacity-90 font-semibold"
-                >
-                  Dashboard →
+                <Button size="lg" onClick={() => router.push("/dashboard")}>
+                  <LayoutDashboard aria-hidden />
+                  Dashboard
+                  <ArrowRight aria-hidden />
                 </Button>
               </div>
             </div>
           </div>
         ) : booting ? (
-          <div className="flex-1 flex items-center justify-center p-8">
+          <div className="flex flex-1 items-center justify-center p-8">
             <div className="flex flex-col items-center gap-3">
-              <div className="w-8 h-8 rounded-full border-2 border-border border-t-primary animate-spin" />
+              <Spinner size="lg" className="text-primary" />
               <p className="text-sm text-muted-foreground">
                 {resumeId
                   ? "Restoring your session…"
@@ -544,7 +559,7 @@ const InterviewContent = () => {
               isLoading={isLoading}
               loadingLabel="Scoring your answer"
             />
-            <div className="border-t border-border/50 bg-background">
+            <div className="border-t border-border bg-background">
               <InputBox
                 onSend={(text) => submit(text)}
                 onSkip={() => submit("", true)}
@@ -578,20 +593,23 @@ function ExitOption({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`w-full text-left rounded-xl border p-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+      className={cn(
+        "w-full rounded-lg border p-3 text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
         destructive
-          ? "border-destructive/30 hover:border-destructive/60 hover:bg-destructive/5"
-          : "border-border hover:border-primary/50 hover:bg-muted/50"
-      }`}
+          ? "border-destructive/25 hover:border-destructive/50 hover:bg-destructive/5"
+          : "border-border hover:border-primary/50 hover:bg-muted/60",
+      )}
     >
       <p
-        className={`text-sm font-semibold ${
-          destructive ? "text-destructive" : "text-foreground"
-        }`}
+        className={cn(
+          "flex items-center gap-2 text-sm font-semibold",
+          destructive ? "text-destructive" : "text-foreground",
+        )}
       >
+        {busy && <Spinner size="sm" className="text-current" />}
         {busy ? "Working…" : title}
       </p>
-      <p className="text-xs text-muted-foreground mt-0.5">{detail}</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">{detail}</p>
     </button>
   );
 }

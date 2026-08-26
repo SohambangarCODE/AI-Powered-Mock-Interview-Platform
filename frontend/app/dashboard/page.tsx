@@ -1,9 +1,47 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Award,
+  Brain,
+  Calendar,
+  ChartColumn,
+  CircleCheck,
+  ClipboardList,
+  Clock,
+  CloudUpload,
+  FileText,
+  Filter,
+  Gauge,
+  ListChecks,
+  NotebookPen,
+  Play,
+  Plus,
+  RotateCcw,
+  ScanSearch,
+  SkipForward,
+  Sparkles,
+  Star,
+  Target,
+  TrendingUp,
+  TriangleAlert,
+  Trophy,
+  Wrench,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import axiosInstance from "@/lib/axios";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Modal } from "@/components/ui/modal";
+import { PageHeader, SectionHeader } from "@/components/ui/page-header";
+import { Skeleton, Spinner, LoadingState } from "@/components/ui/spinner";
+import { StatCard } from "@/components/ui/stat-card";
 import { useAuth } from "@/hooks/useAuth";
+import axiosInstance from "@/lib/axios";
 import {
   INTERVIEW_DOMAINS,
   difficultyMeta,
@@ -15,8 +53,7 @@ import {
   type ActiveSession,
   type InterviewSummary,
 } from "@/lib/interview";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 
 interface ResumeAnalysis {
   summary: string;
@@ -25,6 +62,14 @@ interface ResumeAnalysis {
   experienceLevel: "Junior" | "Mid" | "Senior";
   skillsDetected: string[];
 }
+
+
+const LEVEL_BADGE: Record<string, string> = {
+  Senior: "border-chart-5/25 bg-chart-5/10 text-chart-5",
+  Mid: "border-primary/20 bg-primary/10 text-primary",
+  Junior: "border-success/25 bg-success/10 text-success",
+};
+
 function ResumePanel({
   onDomainSelect,
 }: {
@@ -53,14 +98,13 @@ function ResumePanel({
       "application/msword",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ];
-    // Allow file if type matches OR if filename has valid extension
     const isTypeAllowed = allowedTypes.includes(f.type);
     const allowedExtensions = [".pdf", ".txt", ".doc", ".docx"];
     const fileExtension = f.name?.substring(f.name?.lastIndexOf('.') ?? 0) || '';
     const isExtensionAllowed = allowedExtensions.some(ext =>
       fileExtension.toLowerCase().endsWith(ext)
     );
-    
+
     if (!isTypeAllowed && !isExtensionAllowed) {
       setError("Please upload a PDF, DOC, DOCX, or TXT file.");
       return;
@@ -127,37 +171,31 @@ function ResumePanel({
     setError(null);
     setStep("upload");
   };
-  const levelColor = (l: string) =>
-    l === "Senior"
-      ? "text-purple-500"
-      : l === "Mid"
-        ? "text-blue-500"
-        : "text-green-500";
+
+  const openPicker = () => fileRef.current?.click();
 
   return (
-    <Card className="border border-border/50 overflow-hidden">
+    <Card className="gap-0 overflow-hidden p-0">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 border border-primary/20 flex items-center justify-center text-lg">
-            📄
-          </div>
-          <div>
-            <p className="text-sm font-bold text-foreground">
+      <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <FileText className="size-[18px]" aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">
               AI Resume Analysis
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="truncate text-xs text-muted-foreground">
               Upload your resume · Get domain recommendations
             </p>
           </div>
         </div>
         {step === "results" && (
-          <button
-            onClick={reset}
-            className="text-xs text-muted-foreground hover:text-foreground border border-border/60 px-3 py-1 rounded-full transition-colors"
-          >
-            Upload new ↑
-          </button>
+          <Button variant="outline" size="sm" onClick={reset} className="shrink-0">
+            <CloudUpload aria-hidden />
+            Upload new
+          </Button>
         )}
       </div>
 
@@ -166,6 +204,9 @@ function ResumePanel({
         {step === "upload" && (
           <div className="space-y-4">
             <div
+              role="button"
+              tabIndex={0}
+              aria-label="Choose a resume file"
               onDragOver={(e) => {
                 e.preventDefault();
                 setDragging(true);
@@ -177,14 +218,21 @@ function ResumePanel({
                 const f = e.dataTransfer.files[0];
                 if (f) handleFile(f);
               }}
-              onClick={() => fileRef.current?.click()}
-              className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200 ${
+              onClick={openPicker}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  openPicker();
+                }
+              }}
+              className={cn(
+                "relative cursor-pointer rounded-xl border border-dashed p-8 text-center transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                 dragging
-                  ? "border-primary bg-primary/5 scale-[1.01]"
+                  ? "border-primary bg-primary/5"
                   : file
-                    ? "border-primary/40 bg-primary/[0.03]"
-                    : "border-border/50 hover:border-primary/40 hover:bg-muted/30"
-              }`}
+                    ? "border-primary/40 bg-primary/5"
+                    : "border-border-strong hover:border-primary/50 hover:bg-muted/40",
+              )}
             >
               <input
                 ref={fileRef}
@@ -199,35 +247,39 @@ function ResumePanel({
 
               {file ? (
                 <div className="flex items-center justify-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-2xl">
-                    📋
-                  </div>
-                  <div className="text-left">
-                    <p className="text-sm font-semibold text-foreground truncate max-w-[200px]">
+                  <span className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
+                    <FileText className="size-5" aria-hidden />
+                  </span>
+                  <div className="min-w-0 text-left">
+                    <p className="max-w-[200px] truncate text-sm font-medium text-foreground">
                       {file.name}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {(file.size / 1024).toFixed(0)} KB ·{" "}
                       {file.type.includes("pdf") ? "PDF" : "Document"}
                     </p>
                   </div>
                   <button
+                    type="button"
+                    aria-label="Remove file"
                     onClick={(e) => {
                       e.stopPropagation();
                       reset();
                     }}
-                    className="ml-1 w-7 h-7 rounded-full bg-muted hover:bg-muted/60 flex items-center justify-center text-xs text-muted-foreground flex-shrink-0"
+                    className="ml-1 flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors outline-none hover:bg-border hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
                   >
-                    ✕
+                    <X className="size-3.5" aria-hidden />
                   </button>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  <div className="text-4xl mb-3">☁️</div>
-                  <p className="text-sm font-semibold text-foreground">
+                <div className="flex flex-col items-center">
+                  <span className="mb-3 flex size-11 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground">
+                    <CloudUpload className="size-5" aria-hidden />
+                  </span>
+                  <p className="text-sm font-medium text-foreground">
                     Drop your resume here
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     or click to browse · PDF, DOC, DOCX, TXT · Max 5 MB
                   </p>
                 </div>
@@ -235,84 +287,93 @@ function ResumePanel({
             </div>
 
             {error && (
-              <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 px-3 py-2.5 rounded-xl">
-                ⚠️ {error}
-              </p>
+              <div
+                role="alert"
+                className="flex items-start gap-2.5 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2.5"
+              >
+                <TriangleAlert
+                  className="mt-px size-4 shrink-0 text-destructive"
+                  aria-hidden
+                />
+                <p className="text-sm font-medium text-destructive">{error}</p>
+              </div>
             )}
 
             {!file && (
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {[
                   {
-                    icon: "🔍",
+                    icon: ScanSearch,
                     label: "Skills Detection",
                     desc: "Frameworks, languages, tools",
                   },
                   {
-                    icon: "📊",
+                    icon: ChartColumn,
                     label: "Experience Level",
                     desc: "Junior / Mid / Senior",
                   },
                   {
-                    icon: "🎯",
+                    icon: Target,
                     label: "Domain Matching",
                     desc: "Best-fit interview areas",
                   },
                   {
-                    icon: "💪",
+                    icon: Award,
                     label: "Strength Analysis",
                     desc: "Your competitive edge",
                   },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    className="flex items-start gap-2 p-3 rounded-xl bg-muted/30 border border-border/40"
-                  >
-                    <span className="text-base flex-shrink-0">{item.icon}</span>
-                    <div>
-                      <p className="text-xs font-semibold text-foreground">
-                        {item.label}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {item.desc}
-                      </p>
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div
+                      key={item.label}
+                      className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/40 p-3"
+                    >
+                      <Icon
+                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                        aria-hidden
+                      />
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-foreground">
+                          {item.label}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {item.desc}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
             <Button
               onClick={handleAnalyze}
               disabled={!file}
-              className="w-full rounded-xl bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white font-semibold py-5 disabled:opacity-40 disabled:cursor-not-allowed"
+              size="lg"
+              className="w-full"
             >
-              🤖 Analyse Resume with AI
+              <Sparkles aria-hidden />
+              Analyse Resume with AI
             </Button>
           </div>
         )}
 
         {/* Analyzing */}
         {step === "analyzing" && (
-          <div className="py-10 flex flex-col items-center gap-6">
-            <div className="relative w-16 h-16">
-              <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
-              <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-              <div className="absolute inset-0 flex items-center justify-center text-2xl">
-                🤖
-              </div>
-            </div>
-            <div className="text-center space-y-1.5">
-              <p className="text-sm font-bold text-foreground">
+          <div className="flex flex-col items-center gap-5 py-10">
+            <Spinner size="lg" className="text-primary" label="Analysing" />
+            <div className="space-y-1.5 text-center">
+              <p className="text-sm font-semibold text-foreground">
                 Groq AI is reading your resume…
               </p>
-              <p className="text-xs text-muted-foreground transition-all duration-300">
+              <p aria-live="polite" className="text-xs text-muted-foreground">
                 {analyzingSteps[analyzingStep]}
               </p>
             </div>
-            <div className="w-64 bg-border/50 rounded-full h-1.5 overflow-hidden">
+            <div className="h-1.5 w-64 overflow-hidden rounded-full bg-border">
               <div
-                className="h-full bg-gradient-to-r from-primary to-accent rounded-full animate-pulse"
+                className="h-full animate-pulse rounded-full bg-primary"
                 style={{ width: "70%" }}
               />
             </div>
@@ -324,25 +385,26 @@ function ResumePanel({
 
         {/* Results */}
         {step === "results" && analysis && (
-          <div className="space-y-5">
+          <div className="space-y-6">
             {/* Summary */}
-            <div className="p-4 bg-gradient-to-br from-primary/5 to-accent/5 border border-primary/20 rounded-xl">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">🧠</span>
-                <p className="text-xs font-bold text-foreground">AI Summary</p>
-                <span
-                  className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full border ${
-                    analysis.experienceLevel === "Senior"
-                      ? "bg-purple-500/10 text-purple-500 border-purple-500/20"
-                      : analysis.experienceLevel === "Mid"
-                        ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
-                        : "bg-green-500/10 text-green-600 border-green-500/20"
-                  }`}
+            <div className="rounded-xl border border-border bg-muted/40 p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <Brain className="size-4 text-primary" aria-hidden />
+                <p className="text-xs font-semibold tracking-wide text-foreground uppercase">
+                  AI Summary
+                </p>
+                <Badge
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    "ml-auto",
+                    LEVEL_BADGE[analysis.experienceLevel],
+                  )}
                 >
                   {analysis.experienceLevel} Level
-                </span>
+                </Badge>
               </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 {analysis.summary}
               </p>
             </div>
@@ -350,17 +412,15 @@ function ResumePanel({
             {/* Skills */}
             {analysis.skillsDetected.length > 0 && (
               <div>
-                <p className="text-xs font-bold text-foreground mb-2">
-                  🛠 Skills Detected
+                <p className="mb-2.5 flex items-center gap-2 text-xs font-semibold tracking-wide text-foreground uppercase">
+                  <Wrench className="size-3.5 text-muted-foreground" aria-hidden />
+                  Skills Detected
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {analysis.skillsDetected.map((skill) => (
-                    <span
-                      key={skill}
-                      className="text-xs bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full font-medium"
-                    >
+                    <Badge key={skill} variant="neutral" size="sm">
                       {skill}
-                    </span>
+                    </Badge>
                   ))}
                 </div>
               </div>
@@ -368,52 +428,49 @@ function ResumePanel({
 
             {/* Recommended domains */}
             <div>
-              <p className="text-xs font-bold text-foreground mb-2.5">
-                🎯 Recommended Interview Domains
+              <p className="mb-2.5 flex items-center gap-2 text-xs font-semibold tracking-wide text-foreground uppercase">
+                <Target className="size-3.5 text-muted-foreground" aria-hidden />
+                Recommended Interview Domains
               </p>
               <div className="space-y-2">
                 {analysis.recommendedDomains.map((rec, i) => {
-                  const meta = INTERVIEW_DOMAINS.find(
-                    (d) => d.label === rec.label,
-                  );
+                  const Icon = domainIcon(rec.label);
                   return (
                     <button
                       key={rec.label}
+                      type="button"
                       onClick={() => onDomainSelect(rec.label)}
-                      className="w-full flex items-center gap-3 p-3.5 rounded-xl border border-border/60 hover:border-primary hover:bg-primary/5 transition-all group text-left"
+                      className="group flex w-full items-center gap-3 rounded-lg border border-border p-3.5 text-left transition-colors outline-none hover:border-primary/50 hover:bg-primary/5 focus-visible:ring-3 focus-visible:ring-ring/50"
                     >
-                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-muted/50 border border-border/40 flex items-center justify-center text-xl group-hover:border-primary/30 transition-colors">
-                        {meta?.icon || "🎯"}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground transition-colors group-hover:border-primary/25 group-hover:bg-primary/10 group-hover:text-primary">
+                        <Icon className="size-[18px]" aria-hidden />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-0.5 flex items-center gap-2">
                           {i === 0 && (
-                            <span className="text-[10px] bg-gradient-to-r from-primary to-accent text-white font-bold px-2 py-0.5 rounded-full">
+                            <Badge variant="solid" size="sm">
                               TOP PICK
-                            </span>
+                            </Badge>
                           )}
-                          <p className="text-sm font-semibold text-foreground truncate">
+                          <p className="truncate text-sm font-semibold text-foreground">
                             {rec.label}
                           </p>
                         </div>
-                        <p className="text-xs text-muted-foreground truncate">
+                        <p className="truncate text-xs text-muted-foreground">
                           {rec.reason}
                         </p>
                       </div>
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        <p className="text-xs font-bold text-primary">
+                      <div className="flex w-14 shrink-0 flex-col items-end gap-1.5">
+                        <p className="tnum text-xs font-semibold text-primary">
                           {rec.confidence}%
                         </p>
-                        <div className="w-14 h-1.5 bg-border rounded-full overflow-hidden">
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
                           <div
-                            className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
+                            className="h-full rounded-full bg-primary"
                             style={{ width: `${rec.confidence}%` }}
                           />
                         </div>
                       </div>
-                      <span className="text-primary opacity-0 group-hover:opacity-100 transition-opacity text-sm ml-1">
-                        →
-                      </span>
                     </button>
                   );
                 })}
@@ -422,19 +479,21 @@ function ResumePanel({
 
             {/* Strengths */}
             {analysis.strengths.length > 0 && (
-              <div className="p-4 bg-green-500/5 border border-green-500/20 rounded-xl">
-                <p className="text-xs font-bold text-green-600 dark:text-green-400 mb-2.5">
-                  ✅ Your Strengths
+              <div className="rounded-xl border border-success/25 bg-success/5 p-4">
+                <p className="mb-2.5 flex items-center gap-2 text-xs font-semibold tracking-wide text-success uppercase">
+                  <CircleCheck className="size-3.5" aria-hidden />
+                  Your Strengths
                 </p>
-                <ul className="space-y-1.5">
+                <ul className="space-y-2">
                   {analysis.strengths.map((s) => (
                     <li
                       key={s}
-                      className="text-xs text-muted-foreground flex items-start gap-2"
+                      className="flex items-start gap-2 text-sm text-muted-foreground"
                     >
-                      <span className="text-green-500 mt-0.5 flex-shrink-0">
-                        •
-                      </span>
+                      <span
+                        className="mt-1.5 size-1.5 shrink-0 rounded-full bg-success"
+                        aria-hidden
+                      />
                       {s}
                     </li>
                   ))}
@@ -442,7 +501,7 @@ function ResumePanel({
               </div>
             )}
 
-            <p className="text-[11px] text-muted-foreground text-center">
+            <p className="text-center text-xs text-muted-foreground">
               Click any domain above to start a tailored interview session
             </p>
           </div>
@@ -451,6 +510,12 @@ function ResumePanel({
     </Card>
   );
 }
+
+const TABS = [
+  { id: "history", label: "Interview History", icon: ListChecks },
+  { id: "resume", label: "Resume Analysis", icon: FileText },
+] as const;
+
 const page = () => {
   const router = useRouter();
   const { isLoggedIn, isLoading: authLoading, user } = useAuth();
@@ -458,7 +523,6 @@ const page = () => {
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [ShowDomainSelector, setShowDomainSelector] = useState(false);
-  const [hoveredDomain, setHoveredDomain] = useState<string | null>(null);
   const [filterDomain, setFilterDomain] = useState<string>("All");
   const [activeTab, setActiveTab] = useState<"history" | "resume">("history");
 
@@ -495,11 +559,8 @@ const page = () => {
   };
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        </div>
+      <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center bg-background">
+        <LoadingState label="Loading…" />
       </div>
     );
   }
@@ -529,453 +590,563 @@ const page = () => {
       ? interviews
       : interviews.filter((i) => i.topic === filterDomain);
 
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-8">
-        {/* ── Header ── */}
-        <section className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <p className="text-sm text-muted-foreground font-medium mb-1">
-              👋 Welcome back{user?.name ? `, ${user.name.split(" ")[0]}` : ""}
-            </p>
-            <h1 className="text-3xl md:text-4xl font-black text-foreground">
-              Your Dashboard
-            </h1>
-          </div>
-          <Button
-            size="lg"
-            onClick={() => setShowDomainSelector(true)}
-            className="bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white rounded-full px-6 font-semibold shadow-md hover:shadow-lg transition-all self-start sm:self-auto"
-          >
-            ⚡ New Interview
-          </Button>
-        </section>
-        {/* ── Continue where you left off ── */}
-        {activeSessions.length > 0 && (
-          <section className="space-y-2">
-            <p className="text-sm font-semibold text-foreground">
-              ▶ Continue where you left off
-            </p>
-            {activeSessions.map((session) => {
-              const diff = difficultyMeta(session.currentDifficulty);
-              return (
-                <Card
-                  key={session.id}
-                  className="p-4 border border-primary/30 bg-primary/[0.03] hover:border-primary/60 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-muted/50 border border-border/60 flex items-center justify-center text-xl flex-shrink-0">
-                      {domainIcon(session.domain)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                        <p className="text-sm font-semibold text-foreground truncate">
-                          {session.domain}
-                        </p>
-                        <span
-                          className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${diff.badge}`}
-                        >
-                          {diff.label}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        On Q{session.turnIndex} · {session.answeredCount}{" "}
-                        answered
-                        {session.skippedCount > 0 &&
-                          ` · ${session.skippedCount} skipped`}{" "}
-                        · {formatRelative(session.lastActivityAt)}
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() =>
-                        router.push(`/interview?session=${session.id}`)
-                      }
-                      className="rounded-full text-xs bg-gradient-to-r from-primary to-accent hover:opacity-90 font-semibold flex-shrink-0"
-                    >
-                      Resume →
-                    </Button>
-                  </div>
-                </Card>
-              );
-            })}
-          </section>
-        )}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            {
-              label: "Total Sessions",
-              value: interviews.length.toString(),
-              sub: `${interviews.length} session${interviews.length !== 1 ? "s" : ""}`,
-              icon: "📋",
-            },
-            {
-              label: "Average Score",
-              value: avgScore !== null ? `${avgScore}%` : "—",
-              sub:
-                avgScore !== null
-                  ? avgScore >= 80
-                    ? "Excellent 🔥"
-                    : avgScore >= 60
-                      ? "Good 👍"
-                      : "Keep going 💪"
-                  : "No data yet",
-              icon: "📊",
-              accent: true,
-            },
-            {
-              label: "Best Score",
-              value: bestScore !== null ? `${bestScore}%` : "—",
-              sub: bestScore !== null ? "Personal best" : "No data yet",
-              icon: "🏆",
-            },
-            {
-              label: "Practice Time",
-              value:
-                totalMinutes >= 60
-                  ? `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`
-                  : `${totalMinutes}m`,
-              sub: "Total invested",
-              icon: "⏱",
-            },
-          ].map((stat, i) => (
-            <Card
-              key={i}
-              className={`p-5 border ${
-                (stat as any).accent
-                  ? "border-primary/30 bg-primary/[0.03]"
-                  : "border-border/50"
-              } hover:border-primary/40 transition-colors`}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-xs text-muted-foreground font-medium">
-                  {stat.label}
-                </p>
-                <span className="text-lg">{stat.icon}</span>
-              </div>
-              <p
-                className={`text-2xl font-black mb-0.5 ${
-                  (stat as any).accent
-                    ? "bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent"
-                    : "text-foreground"
-                }`}
-              >
-                {stat.value}
-              </p>
-              <p className="text-xs text-muted-foreground">{stat.sub}</p>
-            </Card>
-          ))}
-        </section>
-        {recentScores.length >= 2 && (
-          <Card className="p-5 border border-border/50">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-foreground mb-0.5">
-                  Score Trend
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Last {recentScores.length} sessions
-                </p>
-              </div>
-              <div className="flex items-end gap-3">
-                <MiniSparkline scores={recentScores} />
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Latest</p>
-                  <p className="text-sm font-bold text-primary">
-                    {recentScores[recentScores.length - 1]}%
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Card>
-        )}
-        <section>
-          <div className="flex items-center gap-1 mb-6 border-b border-border/50">
-            {(["history", "resume"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-all ${
-                  activeTab === tab
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {tab === "history"
-                  ? "📋 Interview History"
-                  : "📄 Resume Analysis"}
-              </button>
-            ))}
-          </div>
-          {activeTab === "history" && (
-            <div>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <p className="text-sm text-muted-foreground">
-                  Your recent practice sessions
-                </p>
-                {uniqueDomains.length > 1 && (
-                  <div className="flex flex-wrap gap-2">
-                    {uniqueDomains.map((d) => (
-                      <button
-                        key={d}
-                        onClick={() => setFilterDomain(d)}
-                        className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${
-                          filterDomain === d
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                        }`}
-                      >
-                        {d}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+  const firstName = user?.name ? user.name.split(" ")[0] : "";
+  const initials =
+    (user?.name || "U")
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase() || "U";
 
-              {dataLoading ? (
-                <div>
-                  {[1, 2, 3].map((i) => (
-                    <Card key={i} className="p-5 border border-border/50">
-                      <div className="animate-pulse flex gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-muted flex-shrink-0" />
-                        <div className="flex-1 space-y-2">
-                          <div className="h-4 bg-muted rounded w-1/3" />
-                          <div className="h-3 bg-muted rounded w-1/2" />
-                        </div>
-                        <div className="w-16 h-8 bg-muted rounded-full" />
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              ) : filtered.length === 0 && interviews.length === 0 ? (
-                <Card className="p-12 text-center border-2 border-dashed border-border">
-                  <div className="text-5xl mb-4">📝</div>
-                  <h3 className="text-lg font-bold text-foreground mb-2">
-                    No sessions yet
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-5 max-w-xs mx-auto">
-                    Start a practice interview or upload your resume for
-                    personalised domain suggestions.
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                    <Button
-                      onClick={() => setShowDomainSelector(true)}
-                      className="bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white rounded-full px-5 text-sm"
-                    >
-                      ⚡ Start Interview
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setActiveTab("resume")}
-                      className="rounded-full px-5 text-sm"
-                    >
-                      📄 Analyse Resume
-                    </Button>
+  const tabCount: Record<string, number | undefined> = {
+    history: interviews.length,
+    resume: undefined,
+  };
+
+  return (
+    <div className="min-h-[calc(100dvh-4rem)] bg-background">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        {/* ── Header ── */}
+        <PageHeader
+          eyebrow={`Welcome back${firstName ? `, ${firstName}` : ""}`}
+          title="Your Dashboard"
+          actions={
+            <Button size="lg" onClick={() => setShowDomainSelector(true)}>
+              <Plus aria-hidden />
+              New Interview
+            </Button>
+          }
+        />
+
+        <div className="mt-8 grid items-start gap-8 lg:grid-cols-[15rem_minmax(0,1fr)]">
+          {/* ── Side rail (desktop) ── */}
+          <aside className="hidden lg:sticky lg:top-24 lg:block">
+            <div className="space-y-6">
+              {/* User profile */}
+              <Card className="gap-0 p-4">
+                <div className="flex items-center gap-3">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                    {initials}
+                  </span>
+                  <div className="min-w-0 leading-tight">
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      {user?.name || "User"}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {user?.email}
+                    </p>
                   </div>
-                </Card>
-              ) : filtered.length === 0 ? (
-                <Card className="p-8 text-center border border-border/50">
-                  <p className="text-muted-foreground text-sm">
-                    No sessions for "{filterDomain}"
-                  </p>
-                </Card>
-              ) : (
-                <div>
-                  {/* Already newest-first from the API — no reverse. */}
-                  {filtered.map((interview) => {
-                    const diff = difficultyMeta(interview.finalDifficulty);
-                    const answerTone = scoreTone(interview.averageAnswerScore);
+                </div>
+              </Card>
+
+              {/* Section nav — switches the panel on the right */}
+              <nav aria-label="Dashboard sections" className="space-y-1">
+                <p className="px-3 pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  Sections
+                </p>
+                {TABS.map((tab) => {
+                  const Icon = tab.icon;
+                  const active = activeTab === tab.id;
+                  const count = tabCount[tab.id];
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      aria-current={active ? "true" : undefined}
+                      className={cn(
+                        "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                        active
+                          ? "bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                      )}
+                    >
+                      <Icon className="size-4 shrink-0" aria-hidden />
+                      <span className="truncate">{tab.label}</span>
+                      {count !== undefined && count > 0 && (
+                        <span className="tnum ml-auto text-xs text-muted-foreground">
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+          </aside>
+
+          {/* ── Main column ── */}
+          <div className="min-w-0 space-y-8">
+            {/* ── Continue where you left off ── */}
+            {activeSessions.length > 0 && (
+              <section className="space-y-3">
+                <SectionHeader
+                  title="Continue where you left off"
+                  description={`${activeSessions.length} session${activeSessions.length === 1 ? "" : "s"} still in progress`}
+                />
+                <Card className="gap-0 divide-y divide-border overflow-hidden border-primary/30 p-0">
+                  {activeSessions.map((session) => {
+                    const diff = difficultyMeta(session.currentDifficulty);
+                    const Icon = domainIcon(session.domain);
                     return (
-                      <Card
-                        key={interview.id}
-                        className="p-5 border border-border/50 hover:border-primary/40 hover:shadow-sm transition-all group"
+                      <div
+                        key={session.id}
+                        className="flex flex-wrap items-center gap-3 bg-primary/5 p-4"
                       >
-                        <div className="flex items-center gap-4">
-                          <div className="w-11 h-11 rounded-xl bg-muted/50 border border-border/60 flex items-center justify-center text-xl flex-shrink-0 group-hover:border-primary/30 transition-colors">
-                            {domainIcon(interview.topic)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <p className="font-semibold text-foreground text-sm truncate">
-                                {interview.topic}
-                              </p>
-                              <ScoreBadge score={interview.score} />
-                              <span
-                                className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${diff.badge}`}
-                              >
-                                ended {diff.label.toLowerCase()}
-                              </span>
-                            </div>
-                            <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
-                              <span>📅 {formatDate(interview.date)}</span>
-                              <span>⏱ {formatMinutes(interview.duration)}</span>
-                              <span>
-                                ✅ {interview.questionsAnswered} answered
-                              </span>
-                              {interview.skippedCount > 0 && (
-                                <span>⏭ {interview.skippedCount} skipped</span>
-                              )}
-                              {interview.averageAnswerScore !== null && (
-                                <span className={answerTone.text}>
-                                  ⭐ {interview.averageAnswerScore}/10 avg
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="hidden md:flex flex-col items-end gap-1 w-28">
-                            <p className="text-xs text-muted-foreground">
-                              Score
+                        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
+                          <Icon className="size-[18px]" aria-hidden />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-0.5 flex flex-wrap items-center gap-2">
+                            <p className="truncate text-sm font-semibold text-foreground">
+                              {session.domain}
                             </p>
-                            <div className="w-full h-1.5 bg-border rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
-                                style={{ width: `${interview.score}%` }}
-                              />
-                            </div>
-                            <p className="text-xs font-semibold text-foreground">
-                              {interview.score}%
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <Button
+                            <Badge
                               variant="outline"
                               size="sm"
-                              className="rounded-full text-xs border-border/60"
-                              onClick={() =>
-                                router.push(`/interviews/${interview.id}`)
-                              }
+                              className={diff.badge}
                             >
-                              Details
-                            </Button>
-                            <Button
-                              size="sm"
-                              className="rounded-full text-xs bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white"
-                              onClick={() => handleSelectDomain(interview.topic)}
-                            >
-                              Retake
-                            </Button>
+                              <span
+                                className={cn(
+                                  "size-1.5 rounded-full",
+                                  diff.dot,
+                                )}
+                                aria-hidden
+                              />
+                              {diff.label}
+                            </Badge>
                           </div>
+                          <p className="text-xs text-muted-foreground">
+                            On Q{session.turnIndex} · {session.answeredCount}{" "}
+                            answered
+                            {session.skippedCount > 0 &&
+                              ` · ${session.skippedCount} skipped`}{" "}
+                            · {formatRelative(session.lastActivityAt)}
+                          </p>
                         </div>
-                      </Card>
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            router.push(`/interview?session=${session.id}`)
+                          }
+                          className="shrink-0"
+                        >
+                          <Play aria-hidden />
+                          Resume
+                        </Button>
+                      </div>
                     );
                   })}
+                </Card>
+              </section>
+            )}
+
+            {/* ── Statistics ── */}
+            <section
+              aria-label="Practice statistics"
+              className="grid grid-cols-2 gap-4 xl:grid-cols-4"
+            >
+              <StatCard
+                label="Total Sessions"
+                value={interviews.length}
+                sub={`${interviews.length} session${interviews.length !== 1 ? "s" : ""}`}
+                icon={ClipboardList}
+              />
+              <StatCard
+                label="Average Score"
+                value={avgScore !== null ? `${avgScore}%` : "—"}
+                sub={
+                  avgScore !== null
+                    ? avgScore >= 80
+                      ? "Excellent"
+                      : avgScore >= 60
+                        ? "Good"
+                        : "Keep going"
+                    : "No data yet"
+                }
+                icon={Gauge}
+                tone="primary"
+                className="border-primary/30 bg-primary/5"
+              />
+              <StatCard
+                label="Best Score"
+                value={bestScore !== null ? `${bestScore}%` : "—"}
+                sub={bestScore !== null ? "Personal best" : "No data yet"}
+                icon={Trophy}
+              />
+              <StatCard
+                label="Practice Time"
+                value={formatMinutes(totalMinutes)}
+                sub="Total invested"
+                icon={Clock}
+              />
+            </section>
+
+            {/* ── Score trend ── */}
+            {recentScores.length >= 2 && (
+              <Card className="gap-0 p-5">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <TrendingUp className="size-4" aria-hidden />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">
+                        Score Trend
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Last {recentScores.length} sessions
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-5">
+                    <MiniSparkline scores={recentScores} />
+                    <div className="text-right">
+                      <p className="text-xs tracking-wide text-muted-foreground uppercase">
+                        Latest
+                      </p>
+                      <p className="tnum text-lg font-semibold text-primary">
+                        {recentScores[recentScores.length - 1]}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {/* ── Sections ── */}
+            <section>
+              {/* Tab strip — the rail replaces this from lg up */}
+              <nav
+                aria-label="Dashboard sections"
+                className="mb-6 flex items-center gap-1 border-b border-border lg:hidden"
+              >
+                {TABS.map((tab) => {
+                  const Icon = tab.icon;
+                  const active = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      aria-current={active ? "true" : undefined}
+                      className={cn(
+                        "-mb-px flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                        active
+                          ? "border-primary text-primary"
+                          : "border-transparent text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      <Icon className="size-4" aria-hidden />
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </nav>
+
+              {activeTab === "history" && (
+                <div className="space-y-4">
+                  <SectionHeader
+                    title="Interview History"
+                    description="Your recent practice sessions"
+                    actions={
+                      uniqueDomains.length > 1 ? (
+                        <div className="flex items-center gap-2">
+                          <Filter
+                            className="size-3.5 shrink-0 text-muted-foreground"
+                            aria-hidden
+                          />
+                          <div className="flex flex-wrap gap-1.5">
+                            {uniqueDomains.map((d) => (
+                              <button
+                                key={d}
+                                type="button"
+                                onClick={() => setFilterDomain(d)}
+                                aria-pressed={filterDomain === d}
+                                className={cn(
+                                  "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                                  filterDomain === d
+                                    ? "border-primary bg-primary text-primary-foreground"
+                                    : "border-border text-muted-foreground hover:border-border-strong hover:text-foreground",
+                                )}
+                              >
+                                {d}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : undefined
+                    }
+                    className="sm:items-end"
+                  />
+
+                  {dataLoading ? (
+                    <Card className="gap-0 divide-y divide-border p-0">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="flex items-center gap-4 p-4">
+                          <Skeleton className="size-10 shrink-0 rounded-lg" />
+                          <div className="flex-1 space-y-2">
+                            <Skeleton className="h-4 w-1/3" />
+                            <Skeleton className="h-3 w-1/2" />
+                          </div>
+                          <Skeleton className="h-8 w-20 shrink-0 rounded-md" />
+                        </div>
+                      ))}
+                    </Card>
+                  ) : filtered.length === 0 && interviews.length === 0 ? (
+                    <Card className="border-dashed p-0">
+                      <EmptyState
+                        icon={NotebookPen}
+                        title="No sessions yet"
+                        description="Start a practice interview or upload your resume for personalised domain suggestions."
+                        action={
+                          <>
+                            <Button onClick={() => setShowDomainSelector(true)}>
+                              <Plus aria-hidden />
+                              Start Interview
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => setActiveTab("resume")}
+                            >
+                              <FileText aria-hidden />
+                              Analyse Resume
+                            </Button>
+                          </>
+                        }
+                      />
+                    </Card>
+                  ) : filtered.length === 0 ? (
+                    <Card className="p-0">
+                      <EmptyState
+                        icon={Filter}
+                        title={`No sessions for "${filterDomain}"`}
+                        action={
+                          <Button
+                            variant="outline"
+                            onClick={() => setFilterDomain("All")}
+                          >
+                            Show all sessions
+                          </Button>
+                        }
+                      />
+                    </Card>
+                  ) : (
+                    <Card className="gap-0 divide-y divide-border overflow-hidden p-0">
+                      {/* Already newest-first from the API — no reverse. */}
+                      {filtered.map((interview) => {
+                        const diff = difficultyMeta(interview.finalDifficulty);
+                        const answerTone = scoreTone(
+                          interview.averageAnswerScore,
+                        );
+                        const Icon = domainIcon(interview.topic);
+                        return (
+                          <div
+                            key={interview.id}
+                            className="group flex flex-col gap-3 p-4 transition-colors hover:bg-muted/40 md:flex-row md:items-center md:gap-4"
+                          >
+                            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground transition-colors group-hover:border-primary/25 group-hover:bg-primary/10 group-hover:text-primary">
+                              <Icon className="size-[18px]" aria-hidden />
+                            </span>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="mb-1 flex flex-wrap items-center gap-2">
+                                <p className="truncate text-sm font-semibold text-foreground">
+                                  {interview.topic}
+                                </p>
+                                <ScoreBadge score={interview.score} />
+                                <Badge
+                                  variant="outline"
+                                  size="sm"
+                                  className={diff.badge}
+                                >
+                                  ended {diff.label.toLowerCase()}
+                                </Badge>
+                              </div>
+                              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                <Meta icon={Calendar}>
+                                  {formatDate(interview.date)}
+                                </Meta>
+                                <Meta icon={Clock}>
+                                  {formatMinutes(interview.duration)}
+                                </Meta>
+                                <Meta icon={CircleCheck}>
+                                  {interview.questionsAnswered} answered
+                                </Meta>
+                                {interview.skippedCount > 0 && (
+                                  <Meta icon={SkipForward}>
+                                    {interview.skippedCount} skipped
+                                  </Meta>
+                                )}
+                                {interview.averageAnswerScore !== null && (
+                                  <Meta
+                                    icon={Star}
+                                    className={answerTone.text}
+                                  >
+                                    {interview.averageAnswerScore}/10 avg
+                                  </Meta>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="hidden w-24 shrink-0 flex-col items-end gap-1.5 lg:flex">
+                              <p className="text-[11px] tracking-wide text-muted-foreground uppercase">
+                                Score
+                              </p>
+                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
+                                <div
+                                  className="h-full rounded-full bg-primary"
+                                  style={{ width: `${interview.score}%` }}
+                                />
+                              </div>
+                              <p className="tnum text-xs font-semibold text-foreground">
+                                {interview.score}%
+                              </p>
+                            </div>
+
+                            <div className="flex shrink-0 items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  router.push(`/interviews/${interview.id}`)
+                                }
+                              >
+                                Details
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  handleSelectDomain(interview.topic)
+                                }
+                              >
+                                <RotateCcw aria-hidden />
+                                Retake
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </Card>
+                  )}
                 </div>
               )}
-            </div>
-          )}
-          {activeTab === "resume" && (
-            <ResumePanel onDomainSelect={handleSelectDomain} />
-          )}
-        </section>
-      </div>
-      {ShowDomainSelector && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowDomainSelector(false);
-          }}
-        >
-          <Card className="w-full max-w-xl p-6 border border-border shadow-2xl">
-            <div className="flex items-start justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-black text-foreground mb-1">
-                  Pick a Domain
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Choose what you want to practice today
-                </p>
-              </div>
-              <button
-                onClick={() => setShowDomainSelector(false)}
-                className="w-8 h-8 rounded-full bg-muted hover:bg-muted/80 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors text-sm"
-              >
-                ✕
-              </button>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-5">
-              {INTERVIEW_DOMAINS.map((domain) => (
-                <button
-                  key={domain.label}
-                  onMouseEnter={() => setHoveredDomain(domain.label)}
-                  onMouseLeave={() => setHoveredDomain(null)}
-                  onClick={() => {
-                    setShowDomainSelector(false);
-                    handleSelectDomain(domain.label);
-                  }}
-                  className={`flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all duration-150 ${
-                    hoveredDomain === domain.label
-                      ? "border-primary bg-primary/5 shadow-sm"
-                      : "border-border/60 hover:border-primary/40"
-                  }`}
-                >
-                  <span className="text-2xl flex-shrink-0">{domain.icon}</span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">
-                      {domain.label}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {domain.desc}
-                    </p>
-                  </div>
-                  <span
-                    className={`ml-auto text-primary transition-opacity text-xs ${hoveredDomain === domain.label ? "opacity-100" : "opacity-0"}`}
-                  >
-                    →
-                  </span>
-                </button>
-              ))}
-            </div> 
-
-            <Button
-              variant="ghost"
-              className="w-full rounded-xl text-muted-foreground hover:text-foreground text-sm"
-              onClick={() => setShowDomainSelector(false)}
-            >
-              Cancel
-            </Button>
-          </Card>
+              {activeTab === "resume" && (
+                <ResumePanel onDomainSelect={handleSelectDomain} />
+              )}
+            </section>
+          </div>
         </div>
-      )}
+      </div>
+
+      {/* ── Domain picker ── */}
+      <Modal
+        open={ShowDomainSelector}
+        onOpenChange={setShowDomainSelector}
+        title="Pick a Domain"
+        description="Choose what you want to practice today"
+        className="max-w-2xl"
+        footer={
+          <Button
+            variant="ghost"
+            onClick={() => setShowDomainSelector(false)}
+          >
+            Cancel
+          </Button>
+        }
+      >
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          {INTERVIEW_DOMAINS.map((domain) => {
+            const Icon = domain.icon;
+            return (
+              <button
+                key={domain.label}
+                type="button"
+                onClick={() => {
+                  setShowDomainSelector(false);
+                  handleSelectDomain(domain.label);
+                }}
+                className="group flex items-center gap-3 rounded-lg border border-border p-3.5 text-left transition-colors outline-none hover:border-primary/50 hover:bg-primary/5 focus-visible:border-primary/50 focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground transition-colors group-hover:border-primary/25 group-hover:bg-primary/10 group-hover:text-primary group-focus-visible:text-primary">
+                  <Icon className="size-[18px]" aria-hidden />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {domain.label}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {domain.desc}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </Modal>
     </div>
   );
 };
 
-function ScoreBadge({ score }: { score: number }) {
-  const color =
-    score >= 80
-      ? "bg-green-500/10 text-green-600 border-green-500/20 dark:text-green-400"
-      : score >= 60
-        ? "bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400"
-        : "bg-orange-500/10 text-orange-600 border-orange-500/20 dark:text-orange-400";
+/** One icon + value pair on a history row's metadata line. */
+function Meta({
+  icon: Icon,
+  children,
+  className,
+}: {
+  icon: LucideIcon;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <span
-      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-xs font-bold ${color}`}
-    >
-      {score >= 80 ? "🟢" : score >= 60 ? "🔵" : "🟠"} {score}%
+    <span className={cn("flex items-center gap-1.5", className)}>
+      <Icon className="size-3.5 shrink-0 opacity-70" aria-hidden />
+      {children}
     </span>
   );
 }
+
+function ScoreBadge({ score }: { score: number }) {
+  const variant = score >= 80 ? "success" : score >= 60 ? "default" : "warning";
+  const dot =
+    score >= 80 ? "bg-success" : score >= 60 ? "bg-primary" : "bg-warning";
+  return (
+    <Badge variant={variant} size="sm" className="tnum">
+      <span className={cn("size-1.5 rounded-full", dot)} aria-hidden />
+      {score}%
+    </Badge>
+  );
+}
+
 function MiniSparkline({ scores }: { scores: number[] }) {
   if (scores.length < 2) return null;
   const max = Math.max(...scores, 100);
   const min = Math.min(...scores, 0);
   const range = max - min || 1;
-  const w = 80,
-    h = 28;
-  const pts = scores
-    .map(
-      (s, i) =>
-        `${(i / (scores.length - 1)) * w},${h - ((s - min) / range) * h}`,
-    )
-    .join(" ");
+  const w = 112,
+    h = 32;
+  const coords = scores.map((s, i) => ({
+    x: (i / (scores.length - 1)) * w,
+    y: h - ((s - min) / range) * h,
+  }));
+  const pts = coords.map((p) => `${p.x},${p.y}`).join(" ");
   return (
     <svg
       width={w}
       height={h}
       viewBox={`0 0 ${w} ${h}`}
+      role="img"
+      aria-label={`Score trend: ${scores.join("%, ")}%`}
       className="overflow-visible"
     >
+      {/* Faint fill under the line so the direction reads at a glance */}
+      <polygon
+        points={`0,${h} ${pts} ${w},${h}`}
+        className="fill-primary/10"
+        stroke="none"
+      />
       <polyline
         points={pts}
         fill="none"
@@ -985,15 +1156,10 @@ function MiniSparkline({ scores }: { scores: number[] }) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      {scores.map((s, i) => {
-        const x = (i / (scores.length - 1)) * w;
-        const y = h - ((s - min) / range) * h;
-        return (
-          <circle key={i} cx={x} cy={y} r="2.5" className="fill-primary" />
-        );
-      })}
+      {coords.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r="2.5" className="fill-primary" />
+      ))}
     </svg>
   );
 }
 export default page;
-

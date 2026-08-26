@@ -118,7 +118,7 @@ export default function DifficultyProgression({
                   x={cx}
                   y={cy - 12}
                   textAnchor="middle"
-                  className="fill-foreground text-[10px] font-bold"
+                  className="fill-foreground text-[10px] font-semibold"
                 >
                   {p.score}
                 </text>
@@ -143,19 +143,19 @@ export default function DifficultyProgression({
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-1 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-green-500" /> 8–10
+          <span className="size-2.5 rounded-full bg-success" /> 8–10
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> 5–7
+          <span className="size-2.5 rounded-full bg-primary" /> 5–7
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> 3–4
+          <span className="size-2.5 rounded-full bg-warning" /> 3–4
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-red-500" /> 0–2
+          <span className="size-2.5 rounded-full bg-destructive" /> 0–2
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full border-2 border-dashed border-muted-foreground" />
+          <span className="size-2.5 rounded-full border-2 border-dashed border-muted-foreground" />
           skipped
         </span>
       </div>

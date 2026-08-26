@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { TriangleAlert } from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
 import { difficultyMeta, scoreTone, type ChatMessage } from "@/lib/interview";
+import { cn } from "@/lib/utils";
 
 interface ChatContainerProps {
   messages: ChatMessage[];
@@ -24,9 +28,9 @@ const ChatContainer = ({
   }, [messages.length, isLoading]);
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-4">
+    <div className="flex-1 space-y-4 overflow-y-auto px-4 py-6 sm:px-6">
       {messages.length === 0 && !isLoading && (
-        <div className="flex items-center justify-center h-full text-muted-foreground">
+        <div className="flex h-full items-center justify-center text-muted-foreground">
           <p className="text-sm">Preparing your first question…</p>
         </div>
       )}
@@ -52,17 +56,18 @@ function AnswerBubble({ message }: { message: ChatMessage }) {
     <div className="flex justify-end">
       <div className="max-w-[85%] sm:max-w-[75%]">
         <div
-          className={
+          className={cn(
+            "rounded-2xl rounded-br-md px-4 py-2.5",
             skipped
-              ? "px-4 py-2.5 rounded-2xl rounded-br-md border border-dashed border-border bg-muted/40 text-muted-foreground italic"
-              : "px-4 py-2.5 rounded-2xl rounded-br-md bg-primary text-primary-foreground"
-          }
+              ? "border border-dashed border-border-strong bg-muted/40 text-muted-foreground italic"
+              : "bg-primary text-primary-foreground shadow-xs",
+          )}
         >
           <p className="text-sm leading-relaxed whitespace-pre-wrap">
             {skipped ? "Skipped this question" : message.content}
           </p>
         </div>
-        <p className="text-[11px] text-muted-foreground mt-1 text-right">
+        <p className="mt-1 text-right text-[11px] text-muted-foreground">
           {formatTimestamp(message.timestamp)}
         </p>
       </div>
@@ -78,31 +83,29 @@ function AiBubble({ message }: { message: ChatMessage }) {
   const diff = message.difficulty ? difficultyMeta(message.difficulty) : null;
 
   const shell = isNudge
-    ? "border-amber-500/40 bg-amber-500/5"
+    ? "border-warning/40 bg-warning/5"
     : isSystem
       ? "border-destructive/40 bg-destructive/5"
       : isQuestion
-        ? "border-border bg-card"
-        : "border-border/60 bg-muted/40";
+        ? "border-border bg-card shadow-xs"
+        : "border-border bg-muted/40";
 
   return (
     <div className="flex justify-start">
       <div className="max-w-[90%] sm:max-w-[80%]">
-        <div className={`rounded-2xl rounded-bl-md border px-4 py-3 ${shell}`}>
+        <div className={cn("rounded-2xl rounded-bl-md border px-4 py-3", shell)}>
           {/* Question header: topic + difficulty */}
           {isQuestion && (diff || message.topic) && (
-            <div className="flex flex-wrap items-center gap-1.5 mb-2">
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
               {diff && (
-                <span
-                  className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${diff.badge}`}
-                >
+                <Badge variant="outline" size="sm" className={diff.badge}>
                   {diff.label}
-                </span>
+                </Badge>
               )}
               {message.topic && (
-                <span className="text-[11px] px-2 py-0.5 rounded-full border border-border bg-background text-muted-foreground font-medium">
+                <Badge variant="outline" size="sm">
                   {message.topic}
-                </span>
+                </Badge>
               )}
             </div>
           )}
@@ -111,37 +114,41 @@ function AiBubble({ message }: { message: ChatMessage }) {
           {message.kind === "feedback" &&
             message.score !== null &&
             message.score !== undefined && (
-              <div className="flex items-center gap-2 mb-2">
-                <span
-                  className={`text-[11px] px-2 py-0.5 rounded-full border font-bold tabular-nums ${tone.badge}`}
+              <div className="mb-2 flex items-center gap-2">
+                <Badge
+                  variant="outline"
+                  size="sm"
+                  className={cn("tnum font-semibold", tone.badge)}
                 >
                   {message.score}/10
-                </span>
-                <span className={`text-[11px] font-semibold ${tone.text}`}>
+                </Badge>
+                <span className={cn("text-[11px] font-semibold", tone.text)}>
                   {tone.label}
                 </span>
               </div>
             )}
 
           {isNudge && (
-            <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 mb-1">
-              ⚠️ Repeated answer
+            <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-warning-foreground">
+              <TriangleAlert className="size-3.5" aria-hidden />
+              Repeated answer
             </p>
           )}
 
           <p
-            className={`text-sm leading-relaxed whitespace-pre-wrap ${
+            className={cn(
+              "text-sm leading-relaxed whitespace-pre-wrap",
               isQuestion
                 ? "font-medium text-foreground"
                 : isSystem
                   ? "text-destructive"
-                  : "text-muted-foreground"
-            }`}
+                  : "text-muted-foreground",
+            )}
           >
             {message.content}
           </p>
         </div>
-        <p className="text-[11px] text-muted-foreground mt-1">
+        <p className="mt-1 text-[11px] text-muted-foreground">
           {formatTimestamp(message.timestamp)}
         </p>
       </div>
@@ -152,12 +159,12 @@ function AiBubble({ message }: { message: ChatMessage }) {
 function TypingBubble({ label }: { label: string }) {
   return (
     <div className="flex justify-start">
-      <div className="rounded-2xl rounded-bl-md border border-border/60 bg-muted/40 px-4 py-3 flex items-center gap-2.5">
+      <div className="flex items-center gap-2.5 rounded-2xl rounded-bl-md border border-border bg-muted/40 px-4 py-3">
         <span className="flex items-center gap-1">
           {[0, 150, 300].map((delay) => (
             <span
               key={delay}
-              className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce"
+              className="size-1.5 animate-bounce rounded-full bg-muted-foreground"
               style={{ animationDelay: `${delay}ms` }}
             />
           ))}

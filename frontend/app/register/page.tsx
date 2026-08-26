@@ -10,8 +10,10 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
+import { Logo } from "@/components/Logo";
 import Link from "next/link";
 import React, { useState } from "react";
+import { CircleAlert } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 const page = () => {
@@ -58,49 +60,35 @@ const page = () => {
     }
   };
 
+  // Only surfaced once both fields have content, so it does not flash while typing.
+  const mismatch =
+    formData.confirmPassword.length > 0 &&
+    formData.password !== formData.confirmPassword;
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md">
-        {/* Logo above the card */}
-        <div className="flex justify-center mb-6">
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="relative w-9 h-9">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary to-accent rounded-xl rotate-6 opacity-40 group-hover:rotate-12 transition-transform duration-300" />
-              <div className="relative w-9 h-9 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center shadow-md">
-                <span className="text-white font-black text-sm tracking-tight">
-                  AI
-                </span>
-              </div>
-            </div>
-            <div className="flex flex-col leading-none">
-              <span className="text-base font-black bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent tracking-tight">
-                MockInterview
-              </span>
-              <span className="text-[10px] text-muted-foreground font-medium tracking-widest uppercase">
-                AI Powered
-              </span>
-            </div>
-          </Link>
+    <div className="section-band flex min-h-[calc(100dvh-4rem)] items-center justify-center px-4 py-12">
+      <div className="w-full max-w-[26rem]">
+        <div className="mb-8 flex justify-center">
+          <Logo size="lg" />
         </div>
 
-        <Card className="border-border shadow-lg">
-          <CardHeader className="space-y-1 text-center">
-            <CardTitle className="text-2xl font-bold">
-              Create your account
-            </CardTitle>
+        <Card className="p-2 shadow-sm">
+          <CardHeader className="space-y-1.5 text-center">
+            <CardTitle className="text-xl">Create your account</CardTitle>
             <CardDescription>
               Start practicing interviews with AI-powered feedback
             </CardDescription>
           </CardHeader>
 
           <form onSubmit={handleSubmit}>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="name">Full name</Label>
                 <Input
                   type="text"
                   id="name"
                   name="name"
+                  autoComplete="name"
                   placeholder="John Doe"
                   value={formData.name}
                   onChange={handleChange}
@@ -114,6 +102,7 @@ const page = () => {
                   type="email"
                   id="email"
                   name="email"
+                  autoComplete="email"
                   placeholder="you@example.com"
                   value={formData.email}
                   onChange={handleChange}
@@ -127,12 +116,16 @@ const page = () => {
                   type="password"
                   id="password"
                   name="password"
+                  autoComplete="new-password"
                   placeholder="••••••••"
                   value={formData.password}
                   onChange={handleChange}
                   required
                   minLength={8}
                 />
+                <p className="text-xs text-muted-foreground">
+                  At least 8 characters.
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -141,35 +134,50 @@ const page = () => {
                   type="password"
                   id="confirmPassword"
                   name="confirmPassword"
+                  autoComplete="new-password"
                   placeholder="••••••••"
                   value={formData.confirmPassword}
                   onChange={handleChange}
+                  aria-invalid={mismatch || undefined}
                   required
                   minLength={8}
                 />
+                {mismatch && (
+                  <p className="text-xs font-medium text-destructive">
+                    Passwords do not match
+                  </p>
+                )}
               </div>
 
               {error && (
-                <p className="text-sm text-destructive font-medium">
-                  {error}
-                </p>
+                <div
+                  role="alert"
+                  className="flex items-start gap-2.5 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2.5"
+                >
+                  <CircleAlert
+                    className="mt-px size-4 shrink-0 text-destructive"
+                    aria-hidden
+                  />
+                  <p className="text-sm font-medium text-destructive">{error}</p>
+                </div>
               )}
             </CardContent>
 
-            <CardFooter className="flex flex-col gap-4">
+            <CardFooter className="flex flex-col gap-4 border-t-0 bg-transparent">
               <Button
                 type="submit"
-                disabled={isLoading}
-                className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
+                size="lg"
+                loading={isLoading}
+                className="w-full"
               >
                 {isLoading ? "Creating account..." : "Get started for free"}
               </Button>
 
-              <p className="text-sm text-muted-foreground text-center">
+              <p className="text-center text-sm text-muted-foreground">
                 Already have an account?{" "}
                 <Link
                   href="/login"
-                  className="text-primary font-medium hover:underline"
+                  className="font-medium text-primary underline-offset-4 hover:underline"
                 >
                   Log in
                 </Link>

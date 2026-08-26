@@ -23,7 +23,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`font-sans antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
     >
       <body suppressHydrationWarning>
         <AuthProvider>

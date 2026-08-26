@@ -1,8 +1,10 @@
 "use client";
 
 import InterviewReport from "@/components/interview/InterviewReport";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/spinner";
 import { useAuth } from "@/hooks/useAuth";
 import axiosInstance from "@/lib/axios";
 import {
@@ -13,6 +15,16 @@ import {
   scoreTone,
   type InterviewDetail,
 } from "@/lib/interview";
+import { cn } from "@/lib/utils";
+import {
+  ArrowLeft,
+  ArrowRight,
+  FileQuestion,
+  LayoutDashboard,
+  Play,
+  RotateCcw,
+  TriangleAlert,
+} from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -57,35 +69,38 @@ export default function InterviewDetailPage() {
 
   if (authLoading || !isLoggedIn) return null;
 
+  const DomainIcon = domainIcon(interview?.domain);
+
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-background">
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+    <div className="min-h-[calc(100dvh-4rem)] bg-background">
+      <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-10">
         <Link
           href="/dashboard"
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1 mb-5"
+          className="mb-6 inline-flex items-center gap-1.5 rounded-md text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
         >
-          ← Back to dashboard
+          <ArrowLeft className="size-4" aria-hidden />
+          Back to dashboard
         </Link>
 
         {loading && (
           <div className="space-y-3">
-            <div className="h-48 rounded-2xl bg-muted animate-pulse" />
-            <div className="h-24 rounded-2xl bg-muted animate-pulse" />
-            <div className="h-24 rounded-2xl bg-muted animate-pulse" />
+            <Skeleton className="h-48 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
+            <Skeleton className="h-24 rounded-xl" />
           </div>
         )}
 
         {!loading && error && (
-          <Card className="p-8 border border-border/60 text-center">
-            <div className="text-3xl mb-3">⚠️</div>
-            <p className="text-base font-bold text-foreground mb-1">
+          <Card className="items-center gap-0 p-8 text-center">
+            <span className="mb-4 flex size-11 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+              <TriangleAlert className="size-5" aria-hidden />
+            </span>
+            <p className="text-base font-semibold text-foreground">
               Nothing to show
             </p>
-            <p className="text-sm text-muted-foreground mb-5">{error}</p>
-            <Button
-              onClick={() => router.push("/dashboard")}
-              className="rounded-full"
-            >
+            <p className="mt-1.5 mb-5 text-sm text-muted-foreground">{error}</p>
+            <Button onClick={() => router.push("/dashboard")}>
+              <LayoutDashboard aria-hidden />
               Back to dashboard
             </Button>
           </Card>
@@ -93,15 +108,15 @@ export default function InterviewDetailPage() {
 
         {!loading && !error && interview && (
           <>
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 border border-primary/20 flex items-center justify-center text-xl flex-shrink-0">
-                {domainIcon(interview.domain)}
-              </div>
+            <div className="mb-6 flex items-center gap-3">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+                <DomainIcon className="size-5" aria-hidden />
+              </span>
               <div className="min-w-0">
-                <h1 className="text-lg font-black text-foreground truncate">
+                <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">
                   {interview.domain} Interview
                 </h1>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   {formatDate(interview.createdAt)}
                 </p>
               </div>
@@ -109,22 +124,24 @@ export default function InterviewDetailPage() {
 
             {/* Still open — offer to pick it back up rather than a half report. */}
             {!interview.isComplete && (
-              <Card className="p-6 border border-border/60 mb-5">
-                <p className="text-base font-bold text-foreground mb-1">
+              <Card className="mb-5 gap-0 border-primary/30 bg-primary/5 p-6">
+                <p className="text-base font-semibold text-foreground">
                   This session is still in progress
                 </p>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="mt-1.5 mb-4 text-sm text-muted-foreground">
                   {interview.questionsAnswered} question
                   {interview.questionsAnswered === 1 ? "" : "s"} answered so far.
                   No report is generated until the interview ends.
                 </p>
                 <Button
+                  className="self-start"
                   onClick={() =>
                     router.push(`/interview?session=${interview._id}`)
                   }
-                  className="rounded-full bg-gradient-to-r from-primary to-accent hover:opacity-90 font-semibold"
                 >
-                  Resume interview →
+                  <Play aria-hidden />
+                  Resume interview
+                  <ArrowRight aria-hidden />
                 </Button>
               </Card>
             )}
@@ -139,15 +156,17 @@ export default function InterviewDetailPage() {
             )}
 
             {interview.isComplete && !interview.report && (
-              <Card className="p-8 border border-border/60 text-center mb-5">
-                <div className="text-3xl mb-3">📄</div>
-                <p className="text-base font-bold text-foreground mb-1">
+              <Card className="mb-5 items-center gap-0 p-8 text-center">
+                <span className="mb-4 flex size-11 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground">
+                  <FileQuestion className="size-5" aria-hidden />
+                </span>
+                <p className="text-base font-semibold text-foreground">
                   No report on file
                 </p>
-                <p className="text-sm text-muted-foreground">
+                <p className="mt-1.5 text-sm text-muted-foreground">
                   This session completed before adaptive reports were
                   introduced. Overall score:{" "}
-                  <span className="font-bold text-foreground">
+                  <span className="tnum font-semibold text-foreground">
                     {interview.score}/100
                   </span>
                 </p>
@@ -156,59 +175,62 @@ export default function InterviewDetailPage() {
 
             {/* Full transcript */}
             {interview.turns?.length > 0 && (
-              <Card className="p-6 border border-border/50 mt-5">
-                <p className="text-sm font-semibold text-foreground mb-1">
+              <Card className="mt-5 gap-0 p-6">
+                <p className="text-base font-semibold text-foreground">
                   Full transcript
                 </p>
-                <p className="text-xs text-muted-foreground mb-4">
+                <p className="mt-1 mb-5 text-sm text-muted-foreground">
                   Every exchange, in order.
                 </p>
-                <div className="space-y-4">
+                <div className="space-y-5">
                   {interview.turns.map((turn) => {
                     const tone = scoreTone(turn.score);
                     const diff = difficultyMeta(turn.difficulty);
                     return (
                       <div
                         key={turn.index}
-                        className="pb-4 border-b border-border/50 last:border-0 last:pb-0"
+                        className="border-b border-border pb-5 last:border-0 last:pb-0"
                       >
-                        <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                          <span className="text-xs font-bold text-muted-foreground">
+                        <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
+                          <span className="tnum text-xs font-semibold text-muted-foreground">
                             Q{turn.index}
                           </span>
-                          <span
-                            className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${diff.badge}`}
+                          <Badge
+                            variant="outline"
+                            size="sm"
+                            className={diff.badge}
                           >
                             {diff.label}
-                          </span>
-                          <span className="text-[11px] px-2 py-0.5 rounded-full border border-border bg-background text-muted-foreground font-medium">
+                          </Badge>
+                          <Badge variant="outline" size="sm">
                             {turn.topic}
-                          </span>
-                          <span
-                            className={`text-[11px] px-2 py-0.5 rounded-full border font-bold tabular-nums ${tone.badge}`}
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            size="sm"
+                            className={cn("tnum font-semibold", tone.badge)}
                           >
                             {turn.skipped || turn.score === null
                               ? "skipped"
                               : `${turn.score}/10`}
-                          </span>
+                          </Badge>
                         </div>
 
-                        <p className="text-sm font-medium text-foreground leading-relaxed mb-2">
+                        <p className="mb-2.5 text-sm leading-relaxed font-medium text-foreground">
                           {turn.question}
                         </p>
 
                         <p
-                          className={`text-xs leading-relaxed whitespace-pre-wrap pl-3 border-l-2 border-border ${
-                            turn.answer
-                              ? "text-muted-foreground"
-                              : "text-muted-foreground italic"
-                          }`}
+                          className={cn(
+                            "border-l-2 border-border pl-3 text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground",
+                            !turn.answer && "italic",
+                          )}
                         >
                           {turn.answer || "No answer given."}
                         </p>
 
                         {turn.feedback && (
-                          <p className="text-xs text-muted-foreground leading-relaxed mt-2">
+                          <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
                             <span className="font-semibold text-foreground">
                               Feedback:{" "}
                             </span>
@@ -222,23 +244,23 @@ export default function InterviewDetailPage() {
               </Card>
             )}
 
-            <div className="grid grid-cols-2 gap-3 mt-5">
+            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Button
                 variant="outline"
+                size="lg"
                 onClick={() =>
                   router.push(
                     `/interview?domain=${encodeURIComponent(interview.domain)}`,
                   )
                 }
-                className="rounded-full border-border/60"
               >
-                🔄 Retake
+                <RotateCcw aria-hidden />
+                Retake
               </Button>
-              <Button
-                onClick={() => router.push("/dashboard")}
-                className="rounded-full bg-gradient-to-r from-primary to-accent hover:opacity-90 font-semibold"
-              >
-                Dashboard →
+              <Button size="lg" onClick={() => router.push("/dashboard")}>
+                <LayoutDashboard aria-hidden />
+                Dashboard
+                <ArrowRight aria-hidden />
               </Button>
             </div>
           </>

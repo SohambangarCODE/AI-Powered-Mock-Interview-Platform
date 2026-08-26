@@ -2,6 +2,21 @@
 // Single source of truth for domain metadata, which previously lived duplicated
 // in both the dashboard and the interview screen.
 
+import {
+  ArrowDown,
+  ArrowUp,
+  Atom,
+  Braces,
+  ChartColumn,
+  Code,
+  Database,
+  Minus,
+  Network,
+  Target,
+  Workflow,
+  type LucideIcon,
+} from "lucide-react";
+
 export type Difficulty = "easy" | "medium" | "hard";
 export type DifficultyChange = "increase" | "maintain" | "decrease";
 export type MessageKind = "question" | "answer" | "feedback" | "nudge" | "system";
@@ -169,24 +184,25 @@ export interface ChatMessage {
 
 export interface DomainMeta {
   label: string;
-  icon: string;
+  /** Rendered by the caller: `const Icon = domainIcon(label)` → `<Icon />`. */
+  icon: LucideIcon;
   desc: string;
 }
 
 export const INTERVIEW_DOMAINS: DomainMeta[] = [
-  { label: "JavaScript/Node.js", icon: "🟨", desc: "ES6+, async, Node runtime" },
-  { label: "React", icon: "⚛️", desc: "Hooks, state, lifecycle" },
-  { label: "Python", icon: "🐍", desc: "OOP, data structures, stdlib" },
-  { label: "Data Science", icon: "📊", desc: "ML, pandas, statistics" },
-  { label: "DevOps", icon: "⚙️", desc: "CI/CD, Docker, Kubernetes" },
-  { label: "System Design", icon: "🏗️", desc: "Scalability, architecture" },
-  { label: "Database Design", icon: "🗄️", desc: "SQL, NoSQL, indexing" },
-  { label: "General", icon: "🎯", desc: "Behavioural & fundamentals" },
+  { label: "JavaScript/Node.js", icon: Braces, desc: "ES6+, async, Node runtime" },
+  { label: "React", icon: Atom, desc: "Hooks, state, lifecycle" },
+  { label: "Python", icon: Code, desc: "OOP, data structures, stdlib" },
+  { label: "Data Science", icon: ChartColumn, desc: "ML, pandas, statistics" },
+  { label: "DevOps", icon: Workflow, desc: "CI/CD, Docker, Kubernetes" },
+  { label: "System Design", icon: Network, desc: "Scalability, architecture" },
+  { label: "Database Design", icon: Database, desc: "SQL, NoSQL, indexing" },
+  { label: "General", icon: Target, desc: "Behavioural & fundamentals" },
 ];
 
 const FALLBACK_DOMAIN: DomainMeta = {
   label: "General",
-  icon: "🎯",
+  icon: Target,
   desc: "Behavioural & fundamentals",
 };
 
@@ -197,7 +213,7 @@ export function domainMeta(label?: string): DomainMeta {
   );
 }
 
-export function domainIcon(label?: string): string {
+export function domainIcon(label?: string): LucideIcon {
   return domainMeta(label).icon;
 }
 
@@ -209,22 +225,20 @@ export const DIFFICULTY_META: Record<
 > = {
   easy: {
     label: "Easy",
-    badge:
-      "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/25",
-    dot: "bg-green-500",
+    badge: "bg-success/10 text-success border-success/25",
+    dot: "bg-success",
     rank: 0,
   },
   medium: {
     label: "Medium",
-    badge: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25",
-    dot: "bg-blue-500",
+    badge: "bg-primary/10 text-primary border-primary/20",
+    dot: "bg-primary",
     rank: 1,
   },
   hard: {
     label: "Hard",
-    badge:
-      "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/25",
-    dot: "bg-purple-500",
+    badge: "bg-chart-5/10 text-chart-5 border-chart-5/25",
+    dot: "bg-chart-5",
     rank: 2,
   },
 };
@@ -237,15 +251,19 @@ export const DIFFICULTY_ORDER: Difficulty[] = ["easy", "medium", "hard"];
 
 export function changeIndicator(change?: DifficultyChange) {
   if (change === "increase")
-    return { arrow: "↑", label: "Harder", className: "text-purple-500" };
+    return { Icon: ArrowUp, label: "Harder", className: "text-chart-5" };
   if (change === "decrease")
-    return { arrow: "↓", label: "Easier", className: "text-amber-500" };
-  return { arrow: "→", label: "Same", className: "text-muted-foreground" };
+    return { Icon: ArrowDown, label: "Easier", className: "text-warning-foreground" };
+  return { Icon: Minus, label: "Same", className: "text-muted-foreground" };
 }
 
 // ── Scores ─────────────────────────────────────────────────
 
-/** Tone for a per-answer score on the 0-10 scale. */
+/**
+ * Tone for a per-answer score on the 0-10 scale.
+ * `hex` exists because SVG stroke/fill attributes cannot resolve `var()`; the
+ * literals mirror the status colours declared in globals.css.
+ */
 export function scoreTone(score: number | null | undefined) {
   if (score === null || score === undefined)
     return {
@@ -258,34 +276,32 @@ export function scoreTone(score: number | null | undefined) {
   if (score >= 8)
     return {
       label: "Strong",
-      text: "text-green-600 dark:text-green-400",
-      badge:
-        "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/25",
-      bar: "bg-green-500",
-      hex: "#22c55e",
+      text: "text-success",
+      badge: "bg-success/10 text-success border-success/25",
+      bar: "bg-success",
+      hex: "#10b981",
     };
   if (score >= 5)
     return {
       label: "Adequate",
-      text: "text-blue-600 dark:text-blue-400",
-      badge: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25",
-      bar: "bg-blue-500",
-      hex: "#3b82f6",
+      text: "text-primary",
+      badge: "bg-primary/10 text-primary border-primary/20",
+      bar: "bg-primary",
+      hex: "#4f46e5",
     };
   if (score >= 3)
     return {
       label: "Weak",
-      text: "text-orange-600 dark:text-orange-400",
-      badge:
-        "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/25",
-      bar: "bg-orange-500",
-      hex: "#f97316",
+      text: "text-warning-foreground",
+      badge: "bg-warning/15 text-warning-foreground border-warning/30",
+      bar: "bg-warning",
+      hex: "#f59e0b",
     };
   return {
     label: "Poor",
-    text: "text-red-600 dark:text-red-400",
-    badge: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/25",
-    bar: "bg-red-500",
+    text: "text-destructive",
+    badge: "bg-destructive/10 text-destructive border-destructive/25",
+    bar: "bg-destructive",
     hex: "#ef4444",
   };
 }
@@ -294,20 +310,20 @@ export function scoreTone(score: number | null | undefined) {
 export function overallTone(score: number) {
   if (score >= 80)
     return {
-      text: "Excellent! You're interview-ready 🚀",
-      color: "text-green-600 dark:text-green-400",
-      hex: "#22c55e",
+      text: "Excellent! You're interview-ready",
+      color: "text-success",
+      hex: "#10b981",
     };
   if (score >= 60)
     return {
-      text: "Good effort! A few more sessions will get you there 💪",
-      color: "text-blue-600 dark:text-blue-400",
-      hex: "#3b82f6",
+      text: "Good effort! A few more sessions will get you there",
+      color: "text-primary",
+      hex: "#4f46e5",
     };
   return {
-    text: "Keep practicing! Every session makes you stronger 🌟",
-    color: "text-orange-600 dark:text-orange-400",
-    hex: "#f97316",
+    text: "Keep practicing! Every session makes you stronger",
+    color: "text-warning-foreground",
+    hex: "#f59e0b",
   };
 }
 

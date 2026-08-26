@@ -1,10 +1,12 @@
 "use client";
 import React from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/Logo";
 import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
 import {
   Menu,
   X,
@@ -18,7 +20,6 @@ import {
 
 function Navbar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { user, isLoggedIn, logout } = useAuth();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -67,17 +68,14 @@ function Navbar() {
     return pathname === path;
   };
 
-  const handleNavClick = (
-    e: React.MouseEvent<HTMLButtonElement>,
-    href: string
-  ) => {
+  const handleNavClick = (e: React.MouseEvent<HTMLElement>, href: string) => {
     if (href.startsWith("/#") && pathname === "/") {
       e.preventDefault();
       const id = href.replace("/#", "");
       const el = document.getElementById(id);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "start" });
-    
+
         window.history.replaceState(null, "", href);
       }
     }
@@ -87,14 +85,18 @@ function Navbar() {
   const navLinks = isLoggedIn
     ? [
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/practice", label: "Practice", icon: Target },
-        { href: "/history", label: "My Sessions", icon: BarChart3 },
+        { href: "/interview", label: "Practice", icon: Target },
+        { href: "/dashboard", label: "My Sessions", icon: BarChart3 },
       ]
     : [
         { href: "/#features", label: "Features", icon: Sparkles },
         { href: "/#how-it-works", label: "How It Works", icon: Search },
         { href: "/#domains", label: "Domains", icon: Puzzle },
       ];
+
+  // Two items can share a destination, so highlight by position rather than by
+  // href — otherwise both would read as current at the same time.
+  const activeIndex = navLinks.findIndex((link) => isActive(link.href));
 
   const initials =
     (user?.name || "U")
@@ -106,74 +108,52 @@ function Navbar() {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 p-1 ${
+      className={cn(
+        "fixed inset-x-0 top-0 z-50 border-b transition-colors duration-200",
         scrolled
-          ? "bg-background/80 backdrop-blur-md border-b border-border shadow-sm"
-          : "bg-background/40 backdrop-blur-sm border-b border-transparent"
-      }`}
+          ? "border-border bg-background/85 backdrop-blur-md"
+          : "border-transparent bg-background"
+      )}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <Link
-            href="/"
-            className="flex items-center gap-2.5 group flex-shrink-0"
-          >
-            <div className="relative w-9 h-9">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary to-accent rounded-xl rotate-6 opacity-40 group-hover:rotate-12 transition-transform duration-300" />
-              <div className="relative w-9 h-9 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center shadow-md">
-                <span className="text-white font-black text-sm tracking-tight">
-                  AI
-                </span>
-              </div>
-            </div>
-            <div className="flex flex-col leading-none">
-              <span className="text-base font-black bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent tracking-tight">
-                MockInterview
-              </span>
-              <span className="text-[10px] text-muted-foreground font-medium tracking-widest uppercase">
-                AI Powered
-              </span>
-            </div>
-          </Link>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex h-16 items-center justify-between gap-4">
+          <Logo />
 
-          {/* Desktop Nav Links */}
-          <div className="hidden md:flex items-center gap-1">
-            {navLinks.map((link) => {
+          {/* Desktop nav links */}
+          <div className="hidden items-center gap-0.5 md:flex">
+            {navLinks.map((link, i) => {
               const Icon = link.icon;
+              const active = i === activeIndex;
               return (
-                <Link key={link.href} href={link.href}>
-                  <button
-                    onClick={(e) => handleNavClick(e, link.href)}
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                      isActive(link.href)
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {link.label}
-                    {isActive(link.href) && (
-                      <span className="sr-only">(current)</span>
-                    )}
-                  </button>
+                <Link
+                  key={link.label}
+                  href={link.href}
+                  aria-current={active ? "page" : undefined}
+                  onClick={(e) => handleNavClick(e, link.href)}
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                    active
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <Icon className="size-4" aria-hidden />
+                  {link.label}
                 </Link>
               );
             })}
           </div>
 
-          {/* Desktop Right Side */}
-          <div className="hidden md:flex items-center gap-3">
+          {/* Desktop right side */}
+          <div className="hidden items-center gap-2 md:flex">
             {isLoggedIn ? (
               <>
-                <div className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full bg-muted/60">
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                    <span className="text-[11px] font-semibold text-white">
-                      {initials}
-                    </span>
-                  </div>
-                  <span className="text-sm text-foreground">
-                    Hi, <span className="font-medium">{firstName}</span>
+                <div className="flex items-center gap-2.5 rounded-full border border-border bg-muted/50 py-1 pr-3 pl-1">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+                    {initials}
+                  </span>
+                  <span className="text-sm font-medium text-foreground">
+                    Hi, {firstName}
                   </span>
                 </div>
                 <Button variant="outline" size="sm" onClick={logout}>
@@ -182,82 +162,74 @@ function Navbar() {
               </>
             ) : (
               <>
-                <Link href="/login">
-                  <Button variant="outline" size="sm">
-                    Log In
-                  </Button>
-                </Link>
-                <Link href="/register">
-                  <Button
-                    size="sm"
-                    className="bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
-                  >
-                    Get Started for free
-                  </Button>
-                </Link>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/login">Log In</Link>
+                </Button>
+                <Button size="sm" asChild>
+                  <Link href="/register">Get Started for free</Link>
+                </Button>
               </>
             )}
           </div>
 
-          {/* Mobile Menu Toggle */}
+          {/* Mobile menu toggle */}
           <button
             onClick={() => setMobileMenuOpen((prev) => !prev)}
-            className="md:hidden p-2 rounded-lg text-foreground hover:bg-muted transition-colors"
+            className="flex size-9 items-center justify-center rounded-lg text-foreground transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden"
             aria-label="Toggle menu"
             aria-expanded={mobileMenuOpen}
           >
             {mobileMenuOpen ? (
-              <X className="w-5 h-5" />
+              <X className="size-5" aria-hidden />
             ) : (
-              <Menu className="w-5 h-5" />
+              <Menu className="size-5" aria-hidden />
             )}
           </button>
         </div>
       </div>
 
-      {/* Mobile Menu Panel */}
+      {/* Mobile menu panel */}
       <div
-        className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out border-t border-border ${
-          mobileMenuOpen ? "max-h-[28rem] opacity-100" : "max-h-0 opacity-0"
-        }`}
+        className={cn(
+          "overflow-hidden border-t border-border transition-all duration-200 ease-in-out md:hidden",
+          mobileMenuOpen ? "max-h-[28rem] opacity-100" : "max-h-0 border-t-0 opacity-0"
+        )}
       >
-        <div className="px-4 sm:px-6 py-4 space-y-1 bg-background/95 backdrop-blur-md">
-          {navLinks.map((link) => {
+        <div className="space-y-1 bg-background px-4 py-4 sm:px-6">
+          {navLinks.map((link, i) => {
             const Icon = link.icon;
+            const active = i === activeIndex;
             return (
-              <Link key={link.href} href={link.href}>
-                <button
-                  onClick={(e) => handleNavClick(e, link.href)}
-                  className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
-                    isActive(link.href)
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {link.label}
-                  {isActive(link.href) && (
-                    <span className="sr-only">(current)</span>
-                  )}
-                </button>
+              <Link
+                key={link.label}
+                href={link.href}
+                aria-current={active ? "page" : undefined}
+                onClick={(e) => handleNavClick(e, link.href)}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  active
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <Icon className="size-4" aria-hidden />
+                {link.label}
               </Link>
             );
           })}
 
-          <div className="pt-3 mt-2 border-t border-border">
+          <div className="mt-2 border-t border-border pt-3">
             {isLoggedIn ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-2.5 px-1">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                    <span className="text-xs font-semibold text-white">
-                      {initials}
-                    </span>
-                  </div>
-                  <div className="flex flex-col leading-tight">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                    {initials}
+                  </span>
+                  <div className="flex min-w-0 flex-col leading-tight">
                     <span className="text-sm font-medium text-foreground">
                       {firstName}
                     </span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="truncate text-xs text-muted-foreground">
                       {user?.email}
                     </span>
                   </div>
@@ -268,16 +240,16 @@ function Navbar() {
               </div>
             ) : (
               <div className="flex flex-col gap-2">
-                <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-                  <Button variant="outline" className="w-full">
+                <Button variant="outline" className="w-full" asChild>
+                  <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
                     Log In
-                  </Button>
-                </Link>
-                <Link href="/register" onClick={() => setMobileMenuOpen(false)}>
-                  <Button className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity">
+                  </Link>
+                </Button>
+                <Button className="w-full" asChild>
+                  <Link href="/register" onClick={() => setMobileMenuOpen(false)}>
                     Get Started for free
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               </div>
             )}
           </div>
