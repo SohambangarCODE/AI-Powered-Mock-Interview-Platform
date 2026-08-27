@@ -50,7 +50,7 @@ function Navbar() {
           }
         });
       },
-      { rootMargin: "-40% 0px -50% 0px", threshold: 0 }
+      { rootMargin: "-40% 0px -50% 0px", threshold: 0 },
     );
 
     const els = sectionIds
@@ -112,7 +112,7 @@ function Navbar() {
         "fixed inset-x-0 top-0 z-50 border-b transition-colors duration-200",
         scrolled
           ? "border-border bg-background/85 backdrop-blur-md"
-          : "border-transparent bg-background"
+          : "border-transparent bg-background",
       )}
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -134,7 +134,7 @@ function Navbar() {
                     "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                     active
                       ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                 >
                   <Icon className="size-4" aria-hidden />
@@ -192,7 +192,9 @@ function Navbar() {
       <div
         className={cn(
           "overflow-hidden border-t border-border transition-all duration-200 ease-in-out md:hidden",
-          mobileMenuOpen ? "max-h-[28rem] opacity-100" : "max-h-0 border-t-0 opacity-0"
+          mobileMenuOpen
+            ? "max-h-[28rem] opacity-100"
+            : "max-h-0 border-t-0 opacity-0",
         )}
       >
         <div className="space-y-1 bg-background px-4 py-4 sm:px-6">
@@ -209,7 +211,7 @@ function Navbar() {
                   "flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                   active
                     ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
               >
                 <Icon className="size-4" aria-hidden />
@@ -246,7 +248,10 @@ function Navbar() {
                   </Link>
                 </Button>
                 <Button className="w-full" asChild>
-                  <Link href="/register" onClick={() => setMobileMenuOpen(false)}>
+                  <Link
+                    href="/register"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
                     Get Started for free
                   </Link>
                 </Button>

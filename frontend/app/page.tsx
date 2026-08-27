@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,8 +39,16 @@ import {
 
 export default function Home() {
   const router = useRouter();
+  const { isLoggedIn, isLoading } = useAuth();
+
   const [activeTab, setActiveTab] = useState(0);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
+
+    useEffect(() => {
+    if (!isLoading && isLoggedIn) {
+      router.replace("/dashboard");
+    }
+  }, [isLoading, isLoggedIn, router]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -283,6 +292,10 @@ export default function Home() {
     { label: "24/7 Available", value: "Practice anytime, anywhere" },
     { label: "Instant Scoring", value: "Get results in seconds" },
   ];
+
+  if (isLoading || isLoggedIn) {
+    return null; 
+  }
 
   return (
     <div className="bg-background">
