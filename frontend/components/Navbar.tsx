@@ -65,7 +65,11 @@ function Navbar() {
     if (path.startsWith("/#")) {
       return pathname === "/" && activeSection === path.replace("/#", "");
     }
+    if (path === "/sessions") {
+    return pathname === path || pathname.startsWith("/sessions/");
+  }
     return pathname === path;
+
   };
 
   const handleNavClick = (e: React.MouseEvent<HTMLElement>, href: string) => {
@@ -86,7 +90,7 @@ function Navbar() {
     ? [
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
         { href: "/interview", label: "Practice", icon: Target },
-        { href: "/dashboard", label: "My Sessions", icon: BarChart3 },
+        { href: "/sessions", label: "My Sessions", icon: BarChart3 },
       ]
     : [
         { href: "/#features", label: "Features", icon: Sparkles },

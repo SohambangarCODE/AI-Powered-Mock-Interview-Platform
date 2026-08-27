@@ -55,6 +55,9 @@ import {
 } from "@/lib/interview";
 import { cn } from "@/lib/utils";
 
+import { useInterviewHistory } from "@/hooks/useInterviewHistory";
+import { InterviewHistoryPanel } from "@/components/dashboard/InterviewHistoryPanel";
+
 interface ResumeAnalysis {
   summary: string;
   strengths: string[];
@@ -519,12 +522,14 @@ const TABS = [
 const page = () => {
   const router = useRouter();
   const { isLoggedIn, isLoading: authLoading, user } = useAuth();
-  const [interviews, setIntervies] = useState<InterviewSummary[]>([]);
-  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
-  const [dataLoading, setDataLoading] = useState(true);
+  // const [interviews, setIntervies] = useState<InterviewSummary[]>([]);
+  // const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
+  // const [dataLoading, setDataLoading] = useState(true);
   const [ShowDomainSelector, setShowDomainSelector] = useState(false);
   const [filterDomain, setFilterDomain] = useState<string>("All");
   const [activeTab, setActiveTab] = useState<"history" | "resume">("history");
+
+  const { interviews, activeSessions, dataLoading } = useInterviewHistory(isLoggedIn);
 
   useEffect(() => {
     if (!authLoading && !isLoggedIn) {
@@ -532,28 +537,30 @@ const page = () => {
     }
   }, [isLoggedIn, authLoading, router]);
 
-  useEffect(() => {
-    if (isLoggedIn) fetchInterviews();
-  }, [isLoggedIn]);
-  const fetchInterviews = async () => {
-    try {
-      setDataLoading(true);
-      // Completed history and in-progress sessions are separate endpoints;
-      // neither should block the other from rendering.
-      const [history, active] = await Promise.allSettled([
-        axiosInstance.get("/api/interviews"),
-        axiosInstance.get("/api/interviews/active"),
-      ]);
-      if (history.status === "fulfilled")
-        setIntervies(history.value.data.interviews || []);
-      else console.error("Failed to fetch interviews:", history.reason);
+  // useEffect(() => {
+  //   if (isLoggedIn) fetchInterviews();
+  // }, [isLoggedIn]);
+  // const fetchInterviews = async () => {
+  //   try {
+  //     setDataLoading(true);
+  //     // Completed history and in-progress sessions are separate endpoints;
+  //     // neither should block the other from rendering.
+  //     const [history, active] = await Promise.allSettled([
+  //       axiosInstance.get("/api/interviews"),
+  //       axiosInstance.get("/api/interviews/active"),
+  //     ]);
+  //     if (history.status === "fulfilled")
+  //       setIntervies(history.value.data.interviews || []);
+  //     else console.error("Failed to fetch interviews:", history.reason);
 
-      if (active.status === "fulfilled")
-        setActiveSessions(active.value.data.active || []);
-    } finally {
-      setDataLoading(false);
-    }
-  };
+  //     if (active.status === "fulfilled")
+  //       setActiveSessions(active.value.data.active || []);
+  //   } finally {
+  //     setDataLoading(false);
+  //   }
+  // };
+  
+  
   const handleSelectDomain = (domain: string) => {
     router.push(`/interview?domain=${encodeURIComponent(domain)}`);
   };
@@ -844,193 +851,15 @@ const page = () => {
               </nav>
 
               {activeTab === "history" && (
-                <div className="space-y-4">
-                  <SectionHeader
-                    title="Interview History"
-                    description="Your recent practice sessions"
-                    actions={
-                      uniqueDomains.length > 1 ? (
-                        <div className="flex items-center gap-2">
-                          <Filter
-                            className="size-3.5 shrink-0 text-muted-foreground"
-                            aria-hidden
-                          />
-                          <div className="flex flex-wrap gap-1.5">
-                            {uniqueDomains.map((d) => (
-                              <button
-                                key={d}
-                                type="button"
-                                onClick={() => setFilterDomain(d)}
-                                aria-pressed={filterDomain === d}
-                                className={cn(
-                                  "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                                  filterDomain === d
-                                    ? "border-primary bg-primary text-primary-foreground"
-                                    : "border-border text-muted-foreground hover:border-border-strong hover:text-foreground",
-                                )}
-                              >
-                                {d}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ) : undefined
-                    }
-                    className="sm:items-end"
-                  />
-
-                  {dataLoading ? (
-                    <Card className="gap-0 divide-y divide-border p-0">
-                      {[1, 2, 3].map((i) => (
-                        <div key={i} className="flex items-center gap-4 p-4">
-                          <Skeleton className="size-10 shrink-0 rounded-lg" />
-                          <div className="flex-1 space-y-2">
-                            <Skeleton className="h-4 w-1/3" />
-                            <Skeleton className="h-3 w-1/2" />
-                          </div>
-                          <Skeleton className="h-8 w-20 shrink-0 rounded-md" />
-                        </div>
-                      ))}
-                    </Card>
-                  ) : filtered.length === 0 && interviews.length === 0 ? (
-                    <Card className="border-dashed p-0">
-                      <EmptyState
-                        icon={NotebookPen}
-                        title="No sessions yet"
-                        description="Start a practice interview or upload your resume for personalised domain suggestions."
-                        action={
-                          <>
-                            <Button onClick={() => setShowDomainSelector(true)}>
-                              <Plus aria-hidden />
-                              Start Interview
-                            </Button>
-                            <Button
-                              variant="outline"
-                              onClick={() => setActiveTab("resume")}
-                            >
-                              <FileText aria-hidden />
-                              Analyse Resume
-                            </Button>
-                          </>
-                        }
-                      />
-                    </Card>
-                  ) : filtered.length === 0 ? (
-                    <Card className="p-0">
-                      <EmptyState
-                        icon={Filter}
-                        title={`No sessions for "${filterDomain}"`}
-                        action={
-                          <Button
-                            variant="outline"
-                            onClick={() => setFilterDomain("All")}
-                          >
-                            Show all sessions
-                          </Button>
-                        }
-                      />
-                    </Card>
-                  ) : (
-                    <Card className="gap-0 divide-y divide-border overflow-hidden p-0">
-                      {/* Already newest-first from the API — no reverse. */}
-                      {filtered.map((interview) => {
-                        const diff = difficultyMeta(interview.finalDifficulty);
-                        const answerTone = scoreTone(
-                          interview.averageAnswerScore,
-                        );
-                        const Icon = domainIcon(interview.topic);
-                        return (
-                          <div
-                            key={interview.id}
-                            className="group flex flex-col gap-3 p-4 transition-colors hover:bg-muted/40 md:flex-row md:items-center md:gap-4"
-                          >
-                            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground transition-colors group-hover:border-primary/25 group-hover:bg-primary/10 group-hover:text-primary">
-                              <Icon className="size-[18px]" aria-hidden />
-                            </span>
-
-                            <div className="min-w-0 flex-1">
-                              <div className="mb-1 flex flex-wrap items-center gap-2">
-                                <p className="truncate text-sm font-semibold text-foreground">
-                                  {interview.topic}
-                                </p>
-                                <ScoreBadge score={interview.score} />
-                                <Badge
-                                  variant="outline"
-                                  size="sm"
-                                  className={diff.badge}
-                                >
-                                  ended {diff.label.toLowerCase()}
-                                </Badge>
-                              </div>
-                              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                                <Meta icon={Calendar}>
-                                  {formatDate(interview.date)}
-                                </Meta>
-                                <Meta icon={Clock}>
-                                  {formatMinutes(interview.duration)}
-                                </Meta>
-                                <Meta icon={CircleCheck}>
-                                  {interview.questionsAnswered} answered
-                                </Meta>
-                                {interview.skippedCount > 0 && (
-                                  <Meta icon={SkipForward}>
-                                    {interview.skippedCount} skipped
-                                  </Meta>
-                                )}
-                                {interview.averageAnswerScore !== null && (
-                                  <Meta
-                                    icon={Star}
-                                    className={answerTone.text}
-                                  >
-                                    {interview.averageAnswerScore}/10 avg
-                                  </Meta>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="hidden w-24 shrink-0 flex-col items-end gap-1.5 lg:flex">
-                              <p className="text-[11px] tracking-wide text-muted-foreground uppercase">
-                                Score
-                              </p>
-                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
-                                <div
-                                  className="h-full rounded-full bg-primary"
-                                  style={{ width: `${interview.score}%` }}
-                                />
-                              </div>
-                              <p className="tnum text-xs font-semibold text-foreground">
-                                {interview.score}%
-                              </p>
-                            </div>
-
-                            <div className="flex shrink-0 items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  router.push(`/interviews/${interview.id}`)
-                                }
-                              >
-                                Details
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  handleSelectDomain(interview.topic)
-                                }
-                              >
-                                <RotateCcw aria-hidden />
-                                Retake
-                              </Button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </Card>
-                  )}
-                </div>
-              )}
+  <InterviewHistoryPanel
+    interviews={interviews}
+    dataLoading={dataLoading}
+    onSelectDomain={handleSelectDomain}
+    onStartInterview={() => setShowDomainSelector(true)}
+    limit={5}
+    viewAllHref="/sessions"
+  />
+)}
 
               {activeTab === "resume" && (
                 <ResumePanel onDomainSelect={handleSelectDomain} />
