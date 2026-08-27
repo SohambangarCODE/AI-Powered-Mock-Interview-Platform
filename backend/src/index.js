@@ -29,6 +29,14 @@ app.get('/', (req, res)=>{
     res.send("backend is alive")
 })
 
+app.get("/health", (req, res) => {
+  res.status(200).json({ 
+    success: true,
+    message: "Server is healthy",
+    timestamp: new Date().toISOString(),
+   });    
+});
+
 app.listen(PORT, ()=>{
     console.log(`Server is running on port ${PORT}`)
 })

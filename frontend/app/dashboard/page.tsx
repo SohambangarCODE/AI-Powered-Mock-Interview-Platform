@@ -66,7 +66,6 @@ interface ResumeAnalysis {
   skillsDetected: string[];
 }
 
-
 const LEVEL_BADGE: Record<string, string> = {
   Senior: "border-chart-5/25 bg-chart-5/10 text-chart-5",
   Mid: "border-primary/20 bg-primary/10 text-primary",
@@ -103,9 +102,10 @@ function ResumePanel({
     ];
     const isTypeAllowed = allowedTypes.includes(f.type);
     const allowedExtensions = [".pdf", ".txt", ".doc", ".docx"];
-    const fileExtension = f.name?.substring(f.name?.lastIndexOf('.') ?? 0) || '';
-    const isExtensionAllowed = allowedExtensions.some(ext =>
-      fileExtension.toLowerCase().endsWith(ext)
+    const fileExtension =
+      f.name?.substring(f.name?.lastIndexOf(".") ?? 0) || "";
+    const isExtensionAllowed = allowedExtensions.some((ext) =>
+      fileExtension.toLowerCase().endsWith(ext),
     );
 
     if (!isTypeAllowed && !isExtensionAllowed) {
@@ -144,12 +144,13 @@ function ResumePanel({
     } catch (error: any) {
       let errorMessage: string;
       if (error?.response?.status === 400) {
-        errorMessage = error.response.data.error || "Invalid file format or file too large.";
+        errorMessage =
+          error.response.data.error || "Invalid file format or file too large.";
       } else if (error?.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error?.response?.status === 500) {
         // Check for specific error messages from backend
-        const backendMsg = error?.response?.data?.error || '';
+        const backendMsg = error?.response?.data?.error || "";
         if (backendMsg.includes("AI service error")) {
           errorMessage = "AI service error. Please try again later.";
         } else if (backendMsg.includes("Failed to extract")) {
@@ -195,7 +196,12 @@ function ResumePanel({
           </div>
         </div>
         {step === "results" && (
-          <Button variant="outline" size="sm" onClick={reset} className="shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={reset}
+            className="shrink-0"
+          >
             <CloudUpload aria-hidden />
             Upload new
           </Button>
@@ -416,7 +422,10 @@ function ResumePanel({
             {analysis.skillsDetected.length > 0 && (
               <div>
                 <p className="mb-2.5 flex items-center gap-2 text-xs font-semibold tracking-wide text-foreground uppercase">
-                  <Wrench className="size-3.5 text-muted-foreground" aria-hidden />
+                  <Wrench
+                    className="size-3.5 text-muted-foreground"
+                    aria-hidden
+                  />
                   Skills Detected
                 </p>
                 <div className="flex flex-wrap gap-1.5">
@@ -432,7 +441,10 @@ function ResumePanel({
             {/* Recommended domains */}
             <div>
               <p className="mb-2.5 flex items-center gap-2 text-xs font-semibold tracking-wide text-foreground uppercase">
-                <Target className="size-3.5 text-muted-foreground" aria-hidden />
+                <Target
+                  className="size-3.5 text-muted-foreground"
+                  aria-hidden
+                />
                 Recommended Interview Domains
               </p>
               <div className="space-y-2">
@@ -529,7 +541,8 @@ const page = () => {
   const [filterDomain, setFilterDomain] = useState<string>("All");
   const [activeTab, setActiveTab] = useState<"history" | "resume">("history");
 
-  const { interviews, activeSessions, dataLoading } = useInterviewHistory(isLoggedIn);
+  const { interviews, activeSessions, dataLoading } =
+    useInterviewHistory(isLoggedIn);
 
   useEffect(() => {
     if (!authLoading && !isLoggedIn) {
@@ -559,8 +572,7 @@ const page = () => {
   //     setDataLoading(false);
   //   }
   // };
-  
-  
+
   const handleSelectDomain = (domain: string) => {
     router.push(`/interview?domain=${encodeURIComponent(domain)}`);
   };
@@ -851,15 +863,15 @@ const page = () => {
               </nav>
 
               {activeTab === "history" && (
-  <InterviewHistoryPanel
-    interviews={interviews}
-    dataLoading={dataLoading}
-    onSelectDomain={handleSelectDomain}
-    onStartInterview={() => setShowDomainSelector(true)}
-    limit={5}
-    viewAllHref="/sessions"
-  />
-)}
+                <InterviewHistoryPanel
+                  interviews={interviews}
+                  dataLoading={dataLoading}
+                  onSelectDomain={handleSelectDomain}
+                  onStartInterview={() => setShowDomainSelector(true)}
+                  limit={5}
+                  viewAllHref="/sessions"
+                />
+              )}
 
               {activeTab === "resume" && (
                 <ResumePanel onDomainSelect={handleSelectDomain} />
@@ -877,10 +889,7 @@ const page = () => {
         description="Choose what you want to practice today"
         className="max-w-2xl"
         footer={
-          <Button
-            variant="ghost"
-            onClick={() => setShowDomainSelector(false)}
-          >
+          <Button variant="ghost" onClick={() => setShowDomainSelector(false)}>
             Cancel
           </Button>
         }
