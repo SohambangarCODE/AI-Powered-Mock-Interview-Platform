@@ -117,7 +117,7 @@ function Navbar() {
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
-          <Logo />
+          <Logo href={isLoggedIn ? "/dashboard" : "/"} />
 
           {/* Desktop nav links */}
           <div className="hidden items-center gap-0.5 md:flex">
