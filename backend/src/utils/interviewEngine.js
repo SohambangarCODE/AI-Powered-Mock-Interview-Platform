@@ -1,18 +1,6 @@
-const Groq = require("groq-sdk");
-const { safeParseJSON, isDuplicateQuestion } = require("./textUtils");
-
-// Constructed on first use, not at import time: the SDK throws when
-// GROQ_API_KEY is unset, which would otherwise take the whole server down at
-// boot instead of failing the one request that needs it.
-let groqClient = null;
-function getGroq() {
-  if (!groqClient) {
-    groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
-  }
-  return groqClient;
-}
-
-const MODEL = "groq/compound-mini";
+const { isDuplicateQuestion } = require("./textUtils");
+// One shared Groq client and one JSON-asking wrapper for the whole project.
+const { askForJSON } = require("./aiClient");
 
 const MIN_QUESTIONS = 4;
 const MAX_QUESTIONS = 10;
@@ -78,29 +66,6 @@ function firstUnusedTopic(askedTopics = []) {
 function fallbackQuestion(domain, difficulty) {
   const build = FALLBACK_QUESTIONS[difficulty] || FALLBACK_QUESTIONS.medium;
   return build(domain);
-}
-
-/**
- * Single place where we talk to Groq. Returns parsed JSON, or null on any
- * failure (network, rate limit, unparseable body) so callers can degrade
- * gracefully instead of throwing mid-interview.
- */
-async function askForJSON({ system, user, temperature = 0.6, maxTokens = 700 }) {
-  try {
-    const completion = await getGroq().chat.completions.create({
-      model: MODEL,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-      temperature,
-      max_tokens: maxTokens,
-    });
-    return safeParseJSON(completion.choices?.[0]?.message?.content);
-  } catch (err) {
-    console.error("Groq call failed:", err.message);
-    return null;
-  }
 }
 
 // ── Prompts ────────────────────────────────────────────────

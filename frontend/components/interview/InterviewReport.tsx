@@ -259,7 +259,17 @@ export default function InterviewReport({
 
 // ── Pieces ───────────────────────────────────────────────
 
-export function ScoreRing({ score }: { score: number }) {
+export function ScoreRing({
+  score,
+  label = "Score",
+  hex,
+}: {
+  score: number;
+  /** Caption under the number. */
+  label?: string;
+  /** Arc colour. Defaults to the interview score palette. */
+  hex?: string;
+}) {
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (Math.max(0, Math.min(100, score)) / 100) * circumference;
@@ -281,7 +291,7 @@ export function ScoreRing({ score }: { score: number }) {
           cy="60"
           r={radius}
           fill="none"
-          stroke={overallTone(score).hex}
+          stroke={hex ?? overallTone(score).hex}
           strokeWidth="8"
           strokeLinecap="round"
           strokeDasharray={circumference}
@@ -296,7 +306,7 @@ export function ScoreRing({ score }: { score: number }) {
           {score}
         </span>
         <span className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
-          Score
+          {label}
         </span>
       </div>
     </div>

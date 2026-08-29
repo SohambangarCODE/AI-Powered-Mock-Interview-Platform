@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   Target,
   BarChart3,
+  Gauge,
   Sparkles,
   Search,
   Puzzle,
@@ -91,6 +92,7 @@ function Navbar() {
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
         { href: "/interview", label: "Practice", icon: Target },
         { href: "/sessions", label: "My Sessions", icon: BarChart3 },
+        { href: "/readiness", label: "Readiness", icon: Gauge },
       ]
     : [
         { href: "/#features", label: "Features", icon: Sparkles },

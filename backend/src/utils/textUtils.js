@@ -96,6 +96,76 @@ function isDuplicateQuestion(candidate, previousQuestions = [], threshold = 0.8)
   });
 }
 
+/**
+ * Repair the two ways a model commonly breaks otherwise-valid JSON:
+ *
+ * 1. Raw control characters inside a string value — a code snippet written with
+ *    real newlines instead of `\n`. Common when a question body contains code.
+ * 2. A body cut short by the token limit, leaving objects/arrays unclosed.
+ *
+ * Scans once, tracking whether it is inside a string, escaping any control
+ * character it finds there and closing whatever is still open at the end.
+ * Returns the repaired text, or null if there is no object to work from.
+ */
+function repairJSON(text) {
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+
+  let out = "";
+  let inString = false;
+  let escaped = false;
+  const owed = []; // closers still needed, innermost last
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+
+    if (inString) {
+      if (escaped) {
+        out += ch;
+        escaped = false;
+      } else if (ch === "\\") {
+        out += ch;
+        escaped = true;
+      } else if (ch === '"') {
+        out += ch;
+        inString = false;
+      } else {
+        const code = ch.charCodeAt(0);
+        if (code < 0x20) {
+          // JSON forbids these unescaped inside a string.
+          out +=
+            ch === "\n"
+              ? "\\n"
+              : ch === "\r"
+                ? "\\r"
+                : ch === "\t"
+                  ? "\\t"
+                  : `\\u${code.toString(16).padStart(4, "0")}`;
+        } else {
+          out += ch;
+        }
+      }
+      continue;
+    }
+
+    if (ch === '"') inString = true;
+    else if (ch === "{") owed.push("}");
+    else if (ch === "[") owed.push("]");
+    else if (ch === "}" || ch === "]") owed.pop();
+    out += ch;
+  }
+
+  // Truncation: close the open string, drop any half-written trailing key or
+  // separator, then close the structures that are still open.
+  if (inString) out += '"';
+  if (owed.length) {
+    out = out.replace(/,\s*"[^"]*"?\s*:?\s*$/, "").replace(/[,:]\s*$/, "");
+    while (owed.length) out += owed.pop();
+  }
+
+  return out;
+}
+
 function safeParseJSON(raw) {
   if (!raw) return null;
   let text = String(raw).trim()
@@ -105,9 +175,27 @@ function safeParseJSON(raw) {
   try {
     return JSON.parse(text);
   } catch {
+    // Reasoning models sometimes emit their scratchpad ahead of the answer. Only
+    // stripped here, in the failure path, so valid JSON that happens to contain
+    // the literal "<think>" in a string value is never touched.
+    const withoutReasoning = text
+      .replace(/<think>[\s\S]*?<\/think>/gi, "")
+      .replace(/^[\s\S]*?<\/think>/i, "")
+      .trim();
+    if (withoutReasoning && withoutReasoning !== text) {
+      try { return JSON.parse(withoutReasoning); } catch { /* keep going */ }
+      text = withoutReasoning;
+    }
+
     const match = text.match(/\{[\s\S]*\}/);
     if (match) {
-      try { return JSON.parse(match[0]); } catch { return null; }
+      try { return JSON.parse(match[0]); } catch { /* fall through to repair */ }
+    }
+    // Last resort: a partial result beats no result, and every caller
+    // validates the fields it needs anyway.
+    const repaired = repairJSON(text);
+    if (repaired) {
+      try { return JSON.parse(repaired); } catch { return null; }
     }
     return null;
   }
@@ -119,4 +207,5 @@ module.exports = {
   isRepeatedAnswer,
   isDuplicateQuestion,
   safeParseJSON,
+  repairJSON,
 };

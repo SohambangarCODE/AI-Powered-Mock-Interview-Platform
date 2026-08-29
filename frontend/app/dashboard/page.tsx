@@ -56,7 +56,9 @@ import {
 import { cn } from "@/lib/utils";
 
 import { useInterviewHistory } from "@/hooks/useInterviewHistory";
+import { useReadiness } from "@/hooks/useReadiness";
 import { InterviewHistoryPanel } from "@/components/dashboard/InterviewHistoryPanel";
+import { ReadinessSummaryPanel } from "@/components/dashboard/ReadinessSummaryPanel";
 
 interface ResumeAnalysis {
   summary: string;
@@ -142,26 +144,20 @@ function ResumePanel({
       setAnalysis(data.analysis);
       setStep("results");
     } catch (error: any) {
+      const status = error?.response?.status;
+      const backendMsg =
+        error?.response?.data?.error || error?.response?.data?.message || "";
       let errorMessage: string;
-      if (error?.response?.status === 400) {
-        errorMessage =
-          error.response.data.error || "Invalid file format or file too large.";
-      } else if (error?.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error?.response?.status === 500) {
-        // Check for specific error messages from backend
-        const backendMsg = error?.response?.data?.error || "";
-        if (backendMsg.includes("AI service error")) {
-          errorMessage = "AI service error. Please try again later.";
-        } else if (backendMsg.includes("Failed to extract")) {
-          errorMessage = "Failed to extract text from resume.";
-        } else if (backendMsg.includes("Failed to parse")) {
-          errorMessage = "Failed to analyze resume data.";
-        } else {
-          errorMessage = "AI analysis failed. Please try again.";
-        }
-      } else {
+      if (!status) {
         errorMessage = "Connection error. Please check your network.";
+      } else if (backendMsg) {
+        // The API explains itself — a rejected file, an exhausted AI quota, an
+        // unreachable model. Rewriting those here only made them vaguer.
+        errorMessage = backendMsg;
+      } else if (status === 400 || status === 413) {
+        errorMessage = "Invalid file format or file too large.";
+      } else {
+        errorMessage = "AI analysis failed. Please try again.";
       }
       setError(errorMessage);
       setStep("upload");
@@ -528,6 +524,7 @@ function ResumePanel({
 
 const TABS = [
   { id: "history", label: "Interview History", icon: ListChecks },
+  { id: "readiness", label: "Placement Readiness", icon: Gauge },
   { id: "resume", label: "Resume Analysis", icon: FileText },
 ] as const;
 
@@ -539,10 +536,16 @@ const page = () => {
   // const [dataLoading, setDataLoading] = useState(true);
   const [ShowDomainSelector, setShowDomainSelector] = useState(false);
   const [filterDomain, setFilterDomain] = useState<string>("All");
-  const [activeTab, setActiveTab] = useState<"history" | "resume">("history");
+  const [activeTab, setActiveTab] = useState<
+    "history" | "readiness" | "resume"
+  >("history");
 
   const { interviews, activeSessions, dataLoading } =
     useInterviewHistory(isLoggedIn);
+
+  // Only fetched once the section is opened — the dashboard should not pay for
+  // three readiness requests every visit.
+  const readiness = useReadiness(isLoggedIn && activeTab === "readiness");
 
   useEffect(() => {
     if (!authLoading && !isLoggedIn) {
@@ -619,6 +622,7 @@ const page = () => {
 
   const tabCount: Record<string, number | undefined> = {
     history: interviews.length,
+    readiness: undefined,
     resume: undefined,
   };
 
@@ -870,6 +874,18 @@ const page = () => {
                   onStartInterview={() => setShowDomainSelector(true)}
                   limit={5}
                   viewAllHref="/sessions"
+                />
+              )}
+
+              {activeTab === "readiness" && (
+                <ReadinessSummaryPanel
+                  assessment={readiness.assessment}
+                  config={readiness.config}
+                  loading={readiness.loading}
+                  error={readiness.loadError}
+                  canGenerate={readiness.availability?.canGenerate ?? false}
+                  onRetry={readiness.reload}
+                  href="/readiness"
                 />
               )}
 
