@@ -7,24 +7,11 @@ const authRoutes = require("./routes/authRoutes");
 const interviewRoutes = require("./routes/interviewRoutes");
 const resumeRoutes = require("./routes/resumeRoutes");
 const readinessRoutes = require("./routes/readinessRoutes");
-const helmet = require("helmet");
 
 const app = express();
 
 connectDB();
 
-app.use(helmet());
-app.use(
-  helmet({
-    frameguard: { action: "deny" }, // X-Frame-Options: DENY
-    contentSecurityPolicy: {
-      directives: {
-        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        "frame-ancestors": ["'none'"],
-      },
-    },
-  })
-);
 app.use(
   cors({
     origin: "*",

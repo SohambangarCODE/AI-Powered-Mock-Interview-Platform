@@ -13,9 +13,8 @@ import {
 import { Logo } from "@/components/Logo";
 import Link from "next/link";
 import React, { useState } from "react";
-import { CircleAlert, Mail } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { SUPPORT_EMAIL } from "@/lib/constants";
 
 const page = () => {
   const { login, isLoading } = useAuth();
@@ -112,9 +111,7 @@ const page = () => {
                     className="mt-px size-4 shrink-0 text-destructive"
                     aria-hidden
                   />
-                  <p className="text-sm font-medium text-destructive">
-                    {error}
-                  </p>
+                  <p className="text-sm font-medium text-destructive">{error}</p>
                 </div>
               )}
             </CardContent>
@@ -141,20 +138,6 @@ const page = () => {
             </CardFooter>
           </form>
         </Card>
-
-        <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
-  <Mail className="size-3.5 shrink-0" aria-hidden />
-  Need help?{" "}
-  
-    <a 
-    href={`https://mail.google.com/mail/?view=cm&fs=1&to=${SUPPORT_EMAIL}`}
-    target="_blank"
-    rel="noopener noreferrer"
-    className="font-medium text-primary underline-offset-4 hover:underline"
-  >
-    {SUPPORT_EMAIL}
-  </a>
-</p>
       </div>
     </div>
   );
