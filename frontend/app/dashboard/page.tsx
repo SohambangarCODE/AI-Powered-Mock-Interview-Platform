@@ -151,8 +151,6 @@ function ResumePanel({
       if (!status) {
         errorMessage = "Connection error. Please check your network.";
       } else if (backendMsg) {
-        // The API explains itself — a rejected file, an exhausted AI quota, an
-        // unreachable model. Rewriting those here only made them vaguer.
         errorMessage = backendMsg;
       } else if (status === 400 || status === 413) {
         errorMessage = "Invalid file format or file too large.";
@@ -531,9 +529,6 @@ const TABS = [
 const page = () => {
   const router = useRouter();
   const { isLoggedIn, isLoading: authLoading, user } = useAuth();
-  // const [interviews, setIntervies] = useState<InterviewSummary[]>([]);
-  // const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
-  // const [dataLoading, setDataLoading] = useState(true);
   const [ShowDomainSelector, setShowDomainSelector] = useState(false);
   const [filterDomain, setFilterDomain] = useState<string>("All");
   const [activeTab, setActiveTab] = useState<
@@ -542,9 +537,6 @@ const page = () => {
 
   const { interviews, activeSessions, dataLoading } =
     useInterviewHistory(isLoggedIn);
-
-  // Only fetched once the section is opened — the dashboard should not pay for
-  // three readiness requests every visit.
   const readiness = useReadiness(isLoggedIn && activeTab === "readiness");
 
   useEffect(() => {
@@ -552,29 +544,6 @@ const page = () => {
       router.push("/login");
     }
   }, [isLoggedIn, authLoading, router]);
-
-  // useEffect(() => {
-  //   if (isLoggedIn) fetchInterviews();
-  // }, [isLoggedIn]);
-  // const fetchInterviews = async () => {
-  //   try {
-  //     setDataLoading(true);
-  //     // Completed history and in-progress sessions are separate endpoints;
-  //     // neither should block the other from rendering.
-  //     const [history, active] = await Promise.allSettled([
-  //       axiosInstance.get("/api/interviews"),
-  //       axiosInstance.get("/api/interviews/active"),
-  //     ]);
-  //     if (history.status === "fulfilled")
-  //       setIntervies(history.value.data.interviews || []);
-  //     else console.error("Failed to fetch interviews:", history.reason);
-
-  //     if (active.status === "fulfilled")
-  //       setActiveSessions(active.value.data.active || []);
-  //   } finally {
-  //     setDataLoading(false);
-  //   }
-  // };
 
   const handleSelectDomain = (domain: string) => {
     router.push(`/interview?domain=${encodeURIComponent(domain)}`);
@@ -597,8 +566,6 @@ const page = () => {
   const bestScore = interviews.length
     ? Math.max(...interviews.map((i) => i.score))
     : null;
-  // The API sorts newest-first, so take the newest six then flip them into
-  // chronological order for the trend line.
   const recentScores = interviews
     .slice(0, 6)
     .map((i) => i.score)
@@ -642,10 +609,8 @@ const page = () => {
         />
 
         <div className="mt-8 grid items-start gap-8 lg:grid-cols-[15rem_minmax(0,1fr)]">
-          {/* ── Side rail (desktop) ── */}
           <aside className="hidden lg:sticky lg:top-24 lg:block">
             <div className="space-y-6">
-              {/* User profile */}
               <Card className="gap-0 p-4">
                 <div className="flex items-center gap-3">
                   <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
@@ -662,7 +627,6 @@ const page = () => {
                 </div>
               </Card>
 
-              {/* Section nav — switches the panel on the right */}
               <nav aria-label="Dashboard sections" className="space-y-1">
                 <p className="px-3 pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
                   Sections
@@ -698,9 +662,7 @@ const page = () => {
             </div>
           </aside>
 
-          {/* ── Main column ── */}
           <div className="min-w-0 space-y-8">
-            {/* ── Continue where you left off ── */}
             {activeSessions.length > 0 && (
               <section className="space-y-3">
                 <SectionHeader
@@ -838,7 +800,6 @@ const page = () => {
 
             {/* ── Sections ── */}
             <section>
-              {/* Tab strip — the rail replaces this from lg up */}
               <nav
                 aria-label="Dashboard sections"
                 className="mb-6 flex items-center gap-1 border-b border-border lg:hidden"
@@ -943,7 +904,6 @@ const page = () => {
   );
 };
 
-/** One icon + value pair on a history row's metadata line. */
 function Meta({
   icon: Icon,
   children,
@@ -994,7 +954,6 @@ function MiniSparkline({ scores }: { scores: number[] }) {
       aria-label={`Score trend: ${scores.join("%, ")}%`}
       className="overflow-visible"
     >
-      {/* Faint fill under the line so the direction reads at a glance */}
       <polygon
         points={`0,${h} ${pts} ${w},${h}`}
         className="fill-primary/10"

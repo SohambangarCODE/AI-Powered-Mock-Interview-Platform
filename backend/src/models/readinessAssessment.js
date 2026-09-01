@@ -1,22 +1,13 @@
 const mongoose = require("mongoose");
 
-/**
- * One persisted record per readiness computation.
- *
- * These are append-only: every "Generate readiness report" run writes a new
- * document, which is what makes the score progression chart, the per-skill
- * improvement/decline tracking, and the trend-aware recommendations possible.
- * The weights in force at the time are stored alongside the scores so an old
- * assessment still explains itself after the config is retuned.
- */
 
 const componentSchema = new mongoose.Schema(
   {
-    key: { type: String, required: true }, // resume | interview | skillAssessment | communication
+    key: { type: String, required: true },
     label: { type: String, default: "" },
-    score: { type: Number, default: null }, // 0-100, null when no data
-    weight: { type: Number, default: 0 }, // configured weight
-    effectiveWeight: { type: Number, default: 0 }, // after renormalising
+    score: { type: Number, default: null }, 
+    weight: { type: Number, default: 0 }, 
+    effectiveWeight: { type: Number, default: 0 },
     hasData: { type: Boolean, default: false },
     detail: { type: mongoose.Schema.Types.Mixed, default: null },
   },
@@ -45,10 +36,7 @@ const roadmapItemSchema = new mongoose.Schema(
       enum: ["high", "medium", "low"],
       default: "medium",
     },
-    // Only set on interview-topic items, so the UI can deep-link into a
-    // practice session for a domain the interview engine supports.
     domain: { type: String, default: "" },
-    // Only set on project items.
     technologies: { type: [String], default: [] },
   },
   { _id: false },
@@ -67,11 +55,6 @@ const roadmapSchema = new mongoose.Schema(
   { _id: false },
 );
 
-/**
- * Per-skill score at the moment of assessment. Comparing snapshots across two
- * assessments is how "improving / declining" is derived — no separate history
- * collection needed.
- */
 const skillSnapshotSchema = new mongoose.Schema(
   {
     skill: { type: String, required: true },
@@ -91,8 +74,6 @@ const readinessAssessmentSchema = new mongoose.Schema({
   // ── Score ───────────────────────────────────────────────
   overallScore: { type: Number, required: true }, // 0-100
   components: { type: [componentSchema], default: [] },
-  // 0-100: how many of the four inputs the candidate actually has data for,
-  // weighted. A high score on thin data is flagged rather than hidden.
   dataCompleteness: { type: Number, default: 0 },
 
   category: {
@@ -108,7 +89,7 @@ const readinessAssessmentSchema = new mongoose.Schema({
     default: "fresher",
   },
   trackLabel: { type: String, default: "" },
-  trackDetected: { type: Boolean, default: true }, // false when user overrode it
+  trackDetected: { type: Boolean, default: true },
 
   // ── AI output ───────────────────────────────────────────
   analysis: { type: analysisSchema, default: () => ({}) },
@@ -116,9 +97,9 @@ const readinessAssessmentSchema = new mongoose.Schema({
 
   // ── Trend + provenance ──────────────────────────────────
   skillSnapshot: { type: [skillSnapshotSchema], default: [] },
-  // Change in overall score vs the previous assessment (null for the first).
+
   scoreDelta: { type: Number, default: null },
-  // What went into this computation, for auditability.
+
   sources: {
     interviewCount: { type: Number, default: 0 },
     assessmentCount: { type: Number, default: 0 },

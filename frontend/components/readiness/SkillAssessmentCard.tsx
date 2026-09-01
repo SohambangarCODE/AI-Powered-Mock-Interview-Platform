@@ -21,11 +21,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingState } from "@/components/ui/spinner";
 import { Modal } from "@/components/ui/modal";
 import { difficultyMeta, formatDate, formatRelative } from "@/lib/interview";
-import {
-  bandTone,
-  type Quiz,
-  type ScoreBand,
-} from "@/lib/readiness";
+import { bandTone, type Quiz, type ScoreBand } from "@/lib/readiness";
 import { useSkillAssessment } from "@/hooks/useSkillAssessment";
 import { cn } from "@/lib/utils";
 
@@ -144,7 +140,9 @@ export default function SkillAssessmentCard({
                 className="mt-px size-4 shrink-0 text-destructive"
                 aria-hidden
               />
-              <p className="text-sm font-medium text-destructive">{loadError}</p>
+              <p className="text-sm font-medium text-destructive">
+                {loadError}
+              </p>
             </div>
             <Button variant="outline" size="sm" onClick={reload}>
               <RotateCcw aria-hidden />
@@ -443,9 +441,15 @@ export default function SkillAssessmentCard({
             {active.questions.map((q) => {
               const diff = difficultyMeta(q.difficulty);
               const chosen = answers[q.index];
+              const legendId = `question-${q.index}-legend`;
               return (
-                <fieldset key={q.index} className="min-w-0">
-                  <legend className="mb-2.5 w-full">
+                <div
+                  key={q.index}
+                  role="group"
+                  aria-labelledby={legendId}
+                  className="min-w-0"
+                >
+                  <div id={legendId} className="mb-2.5 w-full">
                     <span className="flex flex-wrap items-center gap-2">
                       <span className="tnum flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
                         {q.index}
@@ -460,14 +464,14 @@ export default function SkillAssessmentCard({
                     <span className="mt-2 block text-sm font-medium text-foreground">
                       {q.question}
                     </span>
-                  </legend>
+                  </div>
 
                   <div className="space-y-2">
                     {q.options.map((option, optIndex) => {
                       const on = chosen === optIndex;
                       return (
                         <label
-                          key={optIndex}
+                          key={`questtion-${q.index}-option-${optIndex}`}
                           className={cn(
                             "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
                             on
@@ -500,7 +504,7 @@ export default function SkillAssessmentCard({
                       );
                     })}
                   </div>
-                </fieldset>
+                </div>
               );
             })}
           </div>
