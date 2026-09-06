@@ -17,6 +17,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import type { CompanyMeta, CompanyReportSection } from "@/lib/recruiter";
+
 export type Difficulty = "easy" | "medium" | "hard";
 export type DifficultyChange = "increase" | "maintain" | "decrease";
 export type MessageKind = "question" | "answer" | "feedback" | "nudge" | "system";
@@ -63,6 +65,8 @@ export interface QuestionPerformance {
 }
 
 export interface InterviewReport {
+  /** Present only on AI Recruiter Simulator sessions. */
+  company?: CompanyReportSection;
   /** 0-100, derived from the per-answer scores minus the skip penalty. */
   overallScore: number;
   answerQuality: number;
@@ -95,6 +99,9 @@ export interface StartInterviewResponse {
   skippedCount: number;
   minQuestions: number;
   maxQuestions: number;
+  /** Both set only when a company simulation was requested. */
+  domain?: string;
+  company?: CompanyMeta;
 }
 
 export interface SubmitAnswerResponse {
@@ -142,6 +149,8 @@ export interface InterviewDetail {
   messages: StoredMessage[];
   turns: Turn[];
   report: InterviewReport | null;
+  /** Present only on AI Recruiter Simulator sessions. */
+  company?: CompanyMeta | null;
 }
 
 export interface InterviewSummary {
@@ -154,6 +163,8 @@ export interface InterviewSummary {
   questionsAnswered: number;
   skippedCount: number;
   averageAnswerScore: number | null;
+  /** Present only on AI Recruiter Simulator sessions. */
+  company?: CompanyMeta | null;
 }
 
 export interface ActiveSession {
@@ -164,6 +175,8 @@ export interface ActiveSession {
   skippedCount: number;
   turnIndex: number;
   lastActivityAt: string;
+  /** Present only on AI Recruiter Simulator sessions. */
+  company?: CompanyMeta | null;
 }
 
 // ── Chat view model ────────────────────────────────────────

@@ -1,4 +1,6 @@
 const Interview = require("../models/interview");
+const { findProfile } = require("../models/companyProfile");
+const { resolveSelection } = require("../config/companyProfiles");
 const { isRepeatedAnswer } = require("../utils/textUtils");
 const {
   MIN_QUESTIONS,
@@ -6,18 +8,62 @@ const {
   generateOpeningQuestion,
   requestNextStep,
   buildReport,
+  companyContext,
 } = require("../utils/interviewEngine");
 
 const minutesSince = (date) =>
   Math.max(1, Math.round((Date.now() - new Date(date).getTime()) / 60000));
 
 // ── Start Interview ───────────────────────────────────────
+// Two entry points, one engine: a plain mock interview (just `domain`) or an
+// AI Recruiter Simulator round (`companySlug` + `roleId` + `roundId`). In the
+// company case the domain comes from the resolved profile, never from the
+// client, so an arbitrary domain can't ride in on a company session.
 const startInterview = async (req, res) => {
   try {
-    const { domain } = req.body;
+    const { domain: requestedDomain, companySlug, roleId, roundId } = req.body;
+
+    let company = null;
+    let companyMeta = undefined;
+    let domain = requestedDomain;
+    let startDifficulty;
+
+    if (companySlug) {
+      const profile = await findProfile(companySlug);
+      const selection = profile
+        ? resolveSelection({ companySlug, roleId, roundId }, profile)
+        : null;
+
+      if (!selection)
+        return res.status(400).json({
+          message: "Unknown company, role or round for this simulation",
+        });
+
+      domain = selection.domain;
+      startDifficulty = selection.startDifficulty;
+
+      companyMeta = {
+        slug: selection.profile.slug,
+        name: selection.profile.name,
+        roleId: selection.role.id,
+        roleLabel: selection.role.label,
+        roundId: selection.round.id,
+        roundLabel: selection.round.label,
+        expectedStandard: selection.profile.expectedStandard || {},
+      };
+
+      // The engine wants the flattened prompt context, which it derives from a
+      // saved interview — build the same shape from an unsaved stand-in, reusing
+      // the profile already resolved above (which may be the DB copy).
+      company = companyContext({ company: companyMeta }, selection.profile);
+    }
+
     if (!domain) return res.status(400).json({ message: "Domain is required" });
 
-    const { question, topic, difficulty } = await generateOpeningQuestion(domain);
+    const { question, topic, difficulty } = await generateOpeningQuestion(domain, {
+      company,
+      startDifficulty,
+    });
 
     const interview = await Interview.create({
       userId: req.userId,
@@ -28,6 +74,7 @@ const startInterview = async (req, res) => {
       messages: [
         { role: "ai", kind: "question", content: question, difficulty, topic },
       ],
+      ...(companyMeta ? { company: companyMeta } : {}),
     });
 
     res.status(201).json({
@@ -40,6 +87,7 @@ const startInterview = async (req, res) => {
       skippedCount: 0,
       minQuestions: MIN_QUESTIONS,
       maxQuestions: MAX_QUESTIONS,
+      ...(companyMeta ? { domain, company: companyMeta } : {}),
     });
   } catch (error) {
     console.error("Error starting interview:", error);
@@ -270,7 +318,7 @@ const getActiveInterviews = async (req, res) => {
       userId: req.userId,
       isComplete: false,
     })
-      .select("domain currentDifficulty questionsAnswered skippedCount turns lastActivityAt createdAt")
+      .select("domain currentDifficulty questionsAnswered skippedCount turns lastActivityAt createdAt company")
       .sort({ lastActivityAt: -1 })
       .limit(5);
 
@@ -286,6 +334,15 @@ const getActiveInterviews = async (req, res) => {
         skippedCount: i.skippedCount,
         turnIndex: i.turns.length,
         lastActivityAt: i.lastActivityAt || i.createdAt,
+        // Present only on simulator sessions, so the resume card can label them.
+        company: i.company
+          ? {
+              slug: i.company.slug,
+              name: i.company.name,
+              roleLabel: i.company.roleLabel,
+              roundLabel: i.company.roundLabel,
+            }
+          : null,
       }));
 
     res.json({ active });
@@ -300,7 +357,7 @@ const getActiveInterviews = async (req, res) => {
 const getInterviews = async (req, res) => {
   try {
     const interviews = await Interview.find({ userId: req.userId, isComplete: true })
-      .select("domain score duration questionsAnswered skippedCount createdAt currentDifficulty report")
+      .select("domain score duration questionsAnswered skippedCount createdAt currentDifficulty report company")
       .sort({ createdAt: -1 });
 
     const mapped = interviews.map((i) => ({
@@ -313,6 +370,15 @@ const getInterviews = async (req, res) => {
       questionsAnswered: i.questionsAnswered,
       skippedCount: i.skippedCount,
       averageAnswerScore: i.report?.averageAnswerScore ?? null,
+      company: i.company
+        ? {
+            slug: i.company.slug,
+            name: i.company.name,
+            roleLabel: i.company.roleLabel,
+            roundLabel: i.company.roundLabel,
+            meetsStandard: i.report?.company?.meetsStandard ?? null,
+          }
+        : null,
     }));
 
     res.json({ interviews: mapped });

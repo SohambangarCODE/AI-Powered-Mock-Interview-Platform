@@ -25,9 +25,11 @@ import {
   type StoredMessage,
   type SubmitAnswerResponse,
 } from "@/lib/interview";
+import { simulatorHref, type CompanyMeta } from "@/lib/recruiter";
 import { cn } from "@/lib/utils";
 import {
   ArrowRight,
+  Building2,
   CircleCheck,
   LayoutDashboard,
   RotateCcw,
@@ -42,7 +44,15 @@ const InterviewContent = () => {
   const searchParams = useSearchParams();
   const resumeId = searchParams.get("session");
 
+  // AI Recruiter Simulator entry: all three are set together by /recruiter. The
+  // domain is deliberately NOT read from the URL in this case — the backend
+  // derives it from the resolved company profile.
+  const companySlug = searchParams.get("company");
+  const roleId = searchParams.get("role");
+  const roundId = searchParams.get("round");
+
   const [domain, setDomain] = useState(searchParams.get("domain") || "General");
+  const [company, setCompany] = useState<CompanyMeta | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [booting, setBooting] = useState(true);
@@ -121,6 +131,7 @@ const InterviewContent = () => {
         const iv = data.interview;
         setSessionId(iv._id);
         setDomain(iv.domain);
+        setCompany(iv.company ?? null);
         setBounds({
           min: data.meta?.minQuestions ?? 4,
           max: data.meta?.maxQuestions ?? 10,
@@ -159,11 +170,18 @@ const InterviewContent = () => {
 
     const begin = async (forDomain: string) => {
       try {
+        // One endpoint, two entry points: a company simulation sends the
+        // selection and lets the backend pick the domain; a plain mock sends the
+        // domain, exactly as before.
         const { data } = await axiosInstance.post<StartInterviewResponse>(
           "/api/interviews/start",
-          { domain: forDomain },
+          companySlug
+            ? { companySlug, roleId, roundId }
+            : { domain: forDomain },
         );
         setSessionId(data.sessionId);
+        if (data.domain) setDomain(data.domain);
+        if (data.company) setCompany(data.company);
         setDifficulty(data.difficulty);
         setTopic(data.topic);
         setTurnIndex(data.turnIndex);
@@ -330,7 +348,13 @@ const InterviewContent = () => {
   };
 
   const retry = () => {
-    router.push(`/interview?domain=${encodeURIComponent(domain)}`);
+    // Re-run the same kind of session that just finished: a company round goes
+    // back through the simulator route, a plain mock through the domain route.
+    router.push(
+      company?.slug && company.roleId && company.roundId
+        ? simulatorHref(company.slug, company.roleId, company.roundId)
+        : `/interview?domain=${encodeURIComponent(domain)}`,
+    );
     router.refresh();
   };
 
@@ -342,7 +366,8 @@ const InterviewContent = () => {
   const diffMeta = difficultyMeta(difficulty);
   const change = changeIndicator(difficultyChange);
   const ChangeIcon = change.Icon;
-  const DomainIcon = domainIcon(domain);
+  // A simulator round leads with the company; a plain mock leads with the domain.
+  const HeaderIcon = company ? Building2 : domainIcon(domain);
   const durationMinutes = Math.max(1, Math.round(elapsed / 60));
 
   return (
@@ -353,12 +378,14 @@ const InterviewContent = () => {
           <div className="flex items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
-                <DomainIcon className="size-[18px]" aria-hidden />
+                <HeaderIcon className="size-[18px]" aria-hidden />
               </span>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <h1 className="truncate text-base font-semibold tracking-tight text-foreground">
-                    {domain} Interview
+                    {company
+                      ? `${company.name} ${company.roleLabel || "Interview"}`
+                      : `${domain} Interview`}
                   </h1>
                   {!isComplete && (
                     <Badge variant="success" size="sm" className="shrink-0">
@@ -373,9 +400,13 @@ const InterviewContent = () => {
                 <p className="truncate text-xs text-muted-foreground">
                   {isComplete
                     ? endReason || "Session complete"
-                    : topic
-                      ? `Current topic: ${topic}`
-                      : "AI Mock Interview Session"}
+                    : company
+                      ? [company.roundLabel, domain, topic && `Topic: ${topic}`]
+                          .filter(Boolean)
+                          .join(" · ")
+                      : topic
+                        ? `Current topic: ${topic}`
+                        : "AI Mock Interview Session"}
                 </p>
               </div>
             </div>

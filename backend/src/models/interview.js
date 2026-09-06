@@ -33,6 +33,25 @@ const turnSchema = new mongoose.Schema(
   { _id: false },
 );
 
+/**
+ * Set only on AI Recruiter Simulator sessions. Absent on every plain mock
+ * interview, which is what keeps the existing flows byte-identical: `domain`
+ * still holds a real interview domain, so history, /sessions, active-session
+ * resume and the readiness aggregation are unaffected either way.
+ */
+const companySchema = new mongoose.Schema(
+  {
+    slug: { type: String, required: true },
+    name: { type: String, required: true },
+    roleId: { type: String, default: "" },
+    roleLabel: { type: String, default: "" },
+    roundId: { type: String, default: "" },
+    roundLabel: { type: String, default: "" },
+    expectedStandard: { type: mongoose.Schema.Types.Mixed, default: {} },
+  },
+  { _id: false },
+);
+
 const interviewSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   domain: { type: String, required: true },
@@ -52,9 +71,14 @@ const interviewSchema = new mongoose.Schema({
   endReason: { type: String, default: "" },
   report: { type: mongoose.Schema.Types.Mixed, default: null },
   lastActivityAt: { type: Date, default: Date.now },
+
+  // ── AI Recruiter Simulator (optional) ───────────────────
+  company: { type: companySchema, default: undefined },
 });
 
 interviewSchema.index({ userId: 1, isComplete: 1, lastActivityAt: -1 });
+// Company session history, e.g. GET /api/companies/sessions.
+interviewSchema.index({ userId: 1, "company.slug": 1, createdAt: -1 });
 
 interviewSchema.methods.openTurn = function () {
   const last = this.turns[this.turns.length - 1];

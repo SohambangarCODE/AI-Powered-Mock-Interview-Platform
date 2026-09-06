@@ -1,6 +1,8 @@
 const { isDuplicateQuestion } = require("./textUtils");
 // One shared Groq client and one JSON-asking wrapper for the whole project.
 const { askForJSON } = require("./aiClient");
+// Company behaviour is configuration, never branching logic in here.
+const { getProfile, SIMULATION_DISCLAIMER } = require("../config/companyProfiles");
 
 const MIN_QUESTIONS = 4;
 const MAX_QUESTIONS = 10;
@@ -55,32 +57,131 @@ function scoreToDecision(score) {
   return "maintain";
 }
 
-function firstUnusedTopic(askedTopics = []) {
+/**
+ * Next unused topic. A company session prefers that company's own focus areas
+ * before falling back to the generic list, so even the deterministic path stays
+ * on-profile.
+ */
+function firstUnusedTopic(askedTopics = [], company = null) {
   const used = new Set(askedTopics.map((t) => String(t).toLowerCase()));
+  const candidates = company
+    ? [
+        ...(company.roundFocus || []),
+        ...(company.roleEmphasis || []),
+        ...(company.focusAreas || []),
+        ...GENERIC_TOPICS,
+      ]
+    : GENERIC_TOPICS;
+
   return (
-    GENERIC_TOPICS.find((t) => !used.has(t.toLowerCase())) ||
+    candidates.find((t) => t && !used.has(String(t).toLowerCase())) ||
     `Follow-up ${askedTopics.length + 1}`
   );
 }
 
-function fallbackQuestion(domain, difficulty) {
+function fallbackQuestion(domain, difficulty, company) {
   const build = FALLBACK_QUESTIONS[difficulty] || FALLBACK_QUESTIONS.medium;
-  return build(domain);
+  const base = build(domain);
+  // A company session gets the same deterministic question, anchored to one of
+  // its focus areas so even the degraded path stays on-profile.
+  const focus = company?.focusAreas?.[0];
+  return focus ? `${base} Frame your answer around ${focus}.` : base;
+}
+
+// ── Company context (AI Recruiter Simulator) ───────────────
+/**
+ * The block that makes the selected company actually influence the engine.
+ *
+ * Returns "" when there is no company, so a plain mock interview's prompt is
+ * byte-identical to what it has always been — that is the guarantee that the
+ * existing Mock Interview flow is unchanged.
+ */
+function companyPromptBlock(company) {
+  if (!company || !company.name) return "";
+
+  const list = (items, limit = 6) =>
+    Array.isArray(items) && items.length
+      ? items.slice(0, limit).join(", ")
+      : "not specified";
+
+  const criteria = Array.isArray(company.evaluationCriteria)
+    ? company.evaluationCriteria
+        .slice(0, 6)
+        .map(
+          (c) =>
+            `- ${c.label}${c.weight ? ` (weight ${c.weight})` : ""}: ${c.description || ""}`.trim(),
+        )
+        .join("\n")
+    : "";
+
+  return `
+
+COMPANY SIMULATION CONTEXT
+You are running this interview as an interviewer at ${company.name}${
+    company.roleLabel ? `, hiring for: ${company.roleLabel}` : ""
+  }${company.roundLabel ? `, in the round: ${company.roundLabel}` : ""}.
+This is a practice simulation of publicly discussed interview patterns, not any real or confidential process.
+
+Interviewing style you must adopt:
+${company.interviewStyle || "Professional and technically rigorous."}
+${company.roundDescription ? `\nWhat this round is for: ${company.roundDescription}` : ""}
+Focus areas for this company: ${list(company.focusAreas)}
+Emphasis for this role: ${list(company.roleEmphasis)}
+Emphasis for this round: ${list(company.roundFocus)}
+Question types to favour: ${list(company.questionTypes)}
+${criteria ? `\nScore the answer against these criteria, weighted as shown:\n${criteria}` : ""}
+
+Apply this by choosing topics and phrasing questions the way ${company.name} would, and by judging answers against the criteria above. Do not mention that you are following a configuration.`;
+}
+
+/**
+ * Flatten the persisted interview.company sub-document plus its profile into the
+ * shape companyPromptBlock() wants. Returns null for non-company sessions.
+ *
+ * The profile is read synchronously from config rather than the database so this
+ * stays a pure function usable mid-turn; the two agree because boot re-seeds the
+ * collection from the same config. `profile` can be passed in when the caller
+ * already resolved one (e.g. startInterview).
+ */
+function companyContext(interview, profile = null) {
+  const company = interview?.company;
+  if (!company || !company.slug) return null;
+
+  profile = profile || getProfile(company.slug);
+  const role = profile?.roles?.find((r) => r.id === company.roleId);
+  const round = profile?.rounds?.find((r) => r.id === company.roundId);
+
+  return {
+    name: company.name || profile?.name || "",
+    slug: company.slug,
+    roleLabel: company.roleLabel || role?.label || "",
+    roundLabel: company.roundLabel || round?.label || "",
+    roundDescription: round?.description || "",
+    interviewStyle: profile?.interviewStyle || "",
+    focusAreas: profile?.focusAreas || [],
+    questionTypes: profile?.questionTypes || [],
+    evaluationCriteria: profile?.evaluationCriteria || [],
+    roleEmphasis: role?.emphasis || [],
+    roundFocus: round?.focus || [],
+    expectedStandard: company.expectedStandard || profile?.expectedStandard || {},
+  };
 }
 
 // ── Prompts ────────────────────────────────────────────────
-const openingSystemPrompt = (domain) => `
+// `difficulty` defaults to "medium" so a plain mock interview's prompt is
+// unchanged; a company round can open easier or harder per its profile.
+const openingSystemPrompt = (domain, company, difficulty = "medium") => `
 You are a senior technical interviewer starting an ADAPTIVE mock interview for a ${domain} developer role.
-Pick a solid foundational opening topic and ask ONE clear "medium" difficulty question to begin.
+Pick a solid foundational opening topic and ask ONE clear "${difficulty}" difficulty question to begin.
 
 Respond with STRICT JSON ONLY, no markdown, no commentary:
 {
   "nextTopic": "short topic name",
   "nextQuestion": "the opening interview question text"
 }
-`.trim();
+${companyPromptBlock(company)}`.trim();
 
-const engineSystemPrompt = (domain) => `
+const engineSystemPrompt = (domain, company) => `
 You are a senior technical interviewer conducting an ADAPTIVE mock interview for a ${domain} developer role.
 
 Each turn you must:
@@ -111,13 +212,28 @@ Respond with STRICT JSON ONLY, no markdown, no commentary:
   "shouldEnd": true | false,
   "endReason": "short reason if shouldEnd is true, else empty string"
 }
-`.trim();
+${companyPromptBlock(company)}`.trim();
 
 // ── Opening question ───────────────────────────────────────
-async function generateOpeningQuestion(domain) {
+/**
+ * @param {string} domain
+ * @param {object} [options]
+ * @param {object} [options.company]          company context, when simulating one
+ * @param {string} [options.startDifficulty]  opening difficulty; defaults to "medium"
+ */
+async function generateOpeningQuestion(domain, options = {}) {
+  const { company = null, startDifficulty } = options;
+  const difficulty = DIFFICULTIES.includes(startDifficulty)
+    ? startDifficulty
+    : "medium";
+
   const parsed = await askForJSON({
-    system: openingSystemPrompt(domain),
-    user: `Start the interview for a ${domain} candidate.`,
+    system: openingSystemPrompt(domain, company, difficulty),
+    user: company
+      ? `Start the ${company.roundLabel || "interview"} for a ${domain} candidate applying to ${company.name}${
+          company.roleLabel ? ` as a ${company.roleLabel}` : ""
+        }. Ask a "${difficulty}" difficulty opening question.`
+      : `Start the interview for a ${domain} candidate.`,
     temperature: 0.7,
     maxTokens: 300,
   });
@@ -125,13 +241,13 @@ async function generateOpeningQuestion(domain) {
   const question =
     typeof parsed?.nextQuestion === "string" && parsed.nextQuestion.trim()
       ? parsed.nextQuestion.trim()
-      : fallbackQuestion(domain, "medium");
+      : fallbackQuestion(domain, difficulty, company);
   const topic =
     typeof parsed?.nextTopic === "string" && parsed.nextTopic.trim()
       ? parsed.nextTopic.trim()
-      : "Fundamentals";
+      : company?.roundFocus?.[0] || company?.focusAreas?.[0] || "Fundamentals";
 
-  return { question, topic, difficulty: "medium" };
+  return { question, topic, difficulty };
 }
 
 /**
@@ -140,7 +256,15 @@ async function generateOpeningQuestion(domain) {
  * never reach mongoose, or a required-field ValidationError kills the turn.
  */
 function normalizeDecision(parsed, ctx) {
-  const { domain, askedTopics, nextDifficulty, canEnd, mustEnd, mustEndReason } = ctx;
+  const {
+    domain,
+    company = null,
+    askedTopics,
+    nextDifficulty,
+    canEnd,
+    mustEnd,
+    mustEndReason,
+  } = ctx;
   const raw = parsed && typeof parsed === "object" ? parsed : {};
 
   const rawScore = Number(raw.score);
@@ -156,12 +280,12 @@ function normalizeDecision(parsed, ctx) {
   const nextTopic =
     typeof raw.nextTopic === "string" && raw.nextTopic.trim()
       ? raw.nextTopic.trim()
-      : firstUnusedTopic(askedTopics);
+      : firstUnusedTopic(askedTopics, company);
 
   const nextQuestion =
     typeof raw.nextQuestion === "string" && raw.nextQuestion.trim()
       ? raw.nextQuestion.trim()
-      : fallbackQuestion(domain, nextDifficulty);
+      : fallbackQuestion(domain, nextDifficulty, company);
 
   const endReason =
     typeof raw.endReason === "string" ? raw.endReason.trim() : "";
@@ -196,6 +320,9 @@ function normalizeDecision(parsed, ctx) {
  */
 async function requestNextStep({ interview, answerText, skipped = false }) {
   const domain = interview.domain;
+  // Non-null only for AI Recruiter Simulator sessions; everything below behaves
+  // exactly as before when it is null.
+  const company = companyContext(interview);
   const openTurn = interview.openTurn();
   const askedQuestions = interview.askedQuestions();
 
@@ -227,7 +354,7 @@ async function requestNextStep({ interview, answerText, skipped = false }) {
   const buildPayload = (extraInstruction = "") =>
     `
 Domain: ${domain}
-Current difficulty: ${interview.currentDifficulty}
+${company ? `Company: ${company.name}${company.roleLabel ? ` · ${company.roleLabel}` : ""}${company.roundLabel ? ` · ${company.roundLabel}` : ""}\n` : ""}Current difficulty: ${interview.currentDifficulty}
 Topics already covered (do NOT repeat any of these): ${interview.askedTopics.join(", ") || "none"}
 Questions asked so far: ${turnCount}
 Interview may end: ${canEnd ? "yes, if you have enough signal" : "no, not yet"}
@@ -245,7 +372,7 @@ ${extraInstruction}
 `.trim();
 
   let parsed = await askForJSON({
-    system: engineSystemPrompt(domain),
+    system: engineSystemPrompt(domain, company),
     user: buildPayload(),
     temperature: 0.6,
   });
@@ -264,6 +391,7 @@ ${extraInstruction}
 
   const ctx = {
     domain,
+    company,
     askedTopics: interview.askedTopics,
     nextDifficulty,
     canEnd,
@@ -279,7 +407,7 @@ ${extraInstruction}
     isDuplicateQuestion(normalized.nextQuestion, askedQuestions)
   ) {
     const retry = await askForJSON({
-      system: engineSystemPrompt(domain),
+      system: engineSystemPrompt(domain, company),
       user: buildPayload(
         `\nYou have ALREADY asked the following questions. Your next question must be substantively different — new topic, new angle:\n` +
           askedQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n")
@@ -295,8 +423,8 @@ ${extraInstruction}
     normalized = isDuplicateQuestion(retryNormalized.nextQuestion, askedQuestions)
       ? {
           ...normalized,
-          nextTopic: firstUnusedTopic(interview.askedTopics),
-          nextQuestion: fallbackQuestion(domain, nextDifficulty),
+          nextTopic: firstUnusedTopic(interview.askedTopics, company),
+          nextQuestion: fallbackQuestion(domain, nextDifficulty, company),
         }
       : retryNormalized;
   }
@@ -322,9 +450,16 @@ function countTrailingSkips(turns, currentIsSkip) {
 }
 
 // ── Final report ───────────────────────────────────────────
-const reportSystemPrompt = (domain) =>
+const reportSystemPrompt = (domain, company) =>
   `You are an expert technical interview evaluator reviewing a ${domain} mock interview. ` +
-  `You write concise, specific, actionable assessments. Never invent details that aren't in the transcript.`;
+  `You write concise, specific, actionable assessments. Never invent details that aren't in the transcript.` +
+  (company
+    ? ` This session simulated an interview at ${company.name}${
+        company.roleLabel ? ` for a ${company.roleLabel}` : ""
+      }${company.roundLabel ? ` (${company.roundLabel})` : ""}. ` +
+      `Judge the candidate against that company's bar as described, and be explicit about where they fall short of it. ` +
+      `Speak about the simulated profile, never claim knowledge of the company's real internal process.`
+    : "");
 
 /**
  * Build the end-of-interview report.
@@ -334,6 +469,7 @@ const reportSystemPrompt = (domain) =>
  * candidate saw during the interview. The model is only asked for prose.
  */
 async function buildReport(interview) {
+  const company = companyContext(interview);
   const turns = interview.turns.filter((t) => t.answeredAt);
   const scored = turns.filter(
     (t) => !t.skipped && typeof t.score === "number"
@@ -415,8 +551,19 @@ async function buildReport(interview) {
     )
     .join("\n");
 
+  // ── Company standard (deterministic) ───────────────────
+  // Computed here, never asked of the model, for the same reason every other
+  // number in this report is: the verdict must always agree with the scores.
+  const skipRate = turns.length ? skippedCount / turns.length : 0;
+  const standard = company ? normalizeStandard(company.expectedStandard) : null;
+  const meetsStandard = standard
+    ? overallScore >= standard.minOverallScore &&
+      averageAnswerScore >= standard.minAverageAnswerScore &&
+      skipRate <= standard.maxSkipRate
+    : null;
+
   const parsed = await askForJSON({
-    system: reportSystemPrompt(interview.domain),
+    system: reportSystemPrompt(interview.domain, company),
     user: `
 Transcript with per-answer scores:
 ${transcript || "(no answers were given)"}
@@ -430,17 +577,41 @@ Computed stats — use these, do not recalculate:
 - Average answer score: ${averageAnswerScore}/10
 - Overall score: ${overallScore}/100
 - Topic averages: ${topicScores.map((t) => `${t.topic} ${t.score}/10`).join(", ") || "none"}
-
+${
+  company
+    ? `
+Simulated company profile:
+- Company: ${company.name}${company.roleLabel ? ` · ${company.roleLabel}` : ""}${company.roundLabel ? ` · ${company.roundLabel}` : ""}
+- Interviewing style: ${company.interviewStyle || "not specified"}
+- Focus areas: ${(company.focusAreas || []).join(", ") || "not specified"}
+- Evaluation criteria: ${
+        (company.evaluationCriteria || [])
+          .map((c) => `${c.label}${c.weight ? ` (${c.weight})` : ""}`)
+          .join(", ") || "not specified"
+      }
+- Expected standard: overall >= ${standard.minOverallScore}/100, average answer >= ${standard.minAverageAnswerScore}/10, skip rate <= ${Math.round(standard.maxSkipRate * 100)}%
+- Candidate's skip rate: ${Math.round(skipRate * 100)}%
+- Verdict already computed (do not contradict it): the candidate ${meetsStandard ? "MEETS" : "does NOT meet"} this simulated standard.
+`
+    : ""
+}
 Respond with STRICT JSON ONLY, no markdown:
 {
   "strengths": ["2-4 specific things the candidate did well, each one sentence"],
   "weaknesses": ["2-4 specific gaps or mistakes, each one sentence"],
   "progressionSummary": "2-3 sentences on how performance evolved as difficulty changed",
-  "recommendations": ["2-4 concrete next steps, each one sentence"]
+  "recommendations": ["2-4 concrete next steps, each one sentence"]${
+    company
+      ? `,
+  "improvementAreas": ["2-4 areas the candidate must improve to clear this company's bar, each one sentence"],
+  "companyFeedback": "3-4 sentences judging this candidate against the simulated ${company.name} bar, referring to their actual answers",
+  "preparationAreas": ["2-4 concrete things to prepare before interviewing at a company like this, each one sentence"]`
+      : ""
+  }
 }
 `.trim(),
     temperature: 0.5,
-    maxTokens: 800,
+    maxTokens: company ? 1200 : 800,
   });
 
   const strList = (value, fallback) => {
@@ -474,8 +645,120 @@ Respond with STRICT JSON ONLY, no markdown:
     recommendations: strList(parsed?.recommendations, [
       "Complete a full interview to receive tailored recommendations.",
     ]),
+    // Present only on AI Recruiter Simulator sessions. Absent otherwise, so the
+    // existing report renders exactly as it always has.
+    ...(company
+      ? {
+          company: {
+            slug: company.slug,
+            name: company.name,
+            roleLabel: company.roleLabel,
+            roundLabel: company.roundLabel,
+            expectedStandard: standard,
+            candidateScore: overallScore,
+            candidateAverageAnswerScore: averageAnswerScore,
+            skipRate: Math.round(skipRate * 100) / 100,
+            meetsStandard,
+            standardGap: Math.max(0, standard.minOverallScore - overallScore),
+            evaluationCriteria: company.evaluationCriteria || [],
+            focusAreas: company.focusAreas || [],
+            improvementAreas: strList(
+              parsed?.improvementAreas,
+              deterministicImprovementAreas({ weakAreas, skipRate, standard, overallScore }),
+            ),
+            companyFeedback:
+              typeof parsed?.companyFeedback === "string" &&
+              parsed.companyFeedback.trim()
+                ? parsed.companyFeedback.trim()
+                : deterministicCompanyFeedback({
+                    company,
+                    standard,
+                    overallScore,
+                    averageAnswerScore,
+                    meetsStandard,
+                  }),
+            preparationAreas: strList(
+              parsed?.preparationAreas,
+              deterministicPreparationAreas({ company, weakAreas }),
+            ),
+            disclaimer: SIMULATION_DISCLAIMER,
+          },
+        }
+      : {}),
     generatedAt: new Date(),
   };
+}
+
+// ── Company standard helpers ───────────────────────────────
+/** Fill in any missing threshold so the verdict is never NaN-driven. */
+function normalizeStandard(raw) {
+  const s = raw && typeof raw === "object" ? raw : {};
+  const num = (value, fallback) =>
+    Number.isFinite(Number(value)) ? Number(value) : fallback;
+
+  return {
+    minOverallScore: clamp(num(s.minOverallScore, 65), 0, 100),
+    minAverageAnswerScore: clamp(num(s.minAverageAnswerScore, 6.5), 0, 10),
+    maxSkipRate: clamp(num(s.maxSkipRate, 0.25), 0, 1),
+    label: typeof s.label === "string" && s.label.trim() ? s.label.trim() : "Hire bar",
+  };
+}
+
+/**
+ * Fallbacks used when the model is unavailable. Derived from the same computed
+ * numbers as the verdict, so a degraded report still says something true rather
+ * than placeholder text.
+ */
+function deterministicCompanyFeedback({
+  company,
+  standard,
+  overallScore,
+  averageAnswerScore,
+  meetsStandard,
+}) {
+  const gap = standard.minOverallScore - overallScore;
+  return meetsStandard
+    ? `Scored ${overallScore}/100 against the simulated ${company.name} ${standard.label} of ${standard.minOverallScore}/100, with an average answer score of ${averageAnswerScore}/10. On this profile the performance clears the bar.`
+    : `Scored ${overallScore}/100 against the simulated ${company.name} ${standard.label} of ${standard.minOverallScore}/100 — ${gap > 0 ? `${gap} points short` : "short on answer depth or skip rate"}. Average answer score was ${averageAnswerScore}/10 versus the ${standard.minAverageAnswerScore}/10 this profile expects.`;
+}
+
+function deterministicImprovementAreas({ weakAreas, skipRate, standard, overallScore }) {
+  const areas = weakAreas
+    .slice(0, 3)
+    .map((a) => `Raise depth on ${a.topic} — it averaged ${a.score}/10.`);
+
+  if (skipRate > standard.maxSkipRate)
+    areas.push(
+      `Reduce skipped questions: ${Math.round(skipRate * 100)}% were skipped against a ${Math.round(standard.maxSkipRate * 100)}% ceiling on this profile.`,
+    );
+
+  if (!areas.length)
+    areas.push(
+      overallScore >= standard.minOverallScore
+        ? "Keep depth consistent across topics as the difficulty escalates."
+        : "Add concrete detail and trade-off reasoning to every answer.",
+    );
+
+  return areas;
+}
+
+function deterministicPreparationAreas({ company, weakAreas }) {
+  const weakest = weakAreas.slice(0, 2).map((a) => a.topic);
+  const focus = (company.focusAreas || []).slice(0, 3);
+  const areas = [];
+
+  if (weakest.length)
+    areas.push(`Revise ${weakest.join(" and ")} before the next attempt.`);
+  if (focus.length)
+    areas.push(
+      `Practise this profile's focus areas: ${focus.join(", ")}.`,
+    );
+  if (company.roundLabel)
+    areas.push(`Rehearse the format of the ${company.roundLabel} round specifically.`);
+
+  return areas.length
+    ? areas
+    : ["Complete another round to gather more signal on where to prepare."];
 }
 
 module.exports = {
@@ -488,4 +771,5 @@ module.exports = {
   buildReport,
   shiftDifficulty,
   scoreToDecision,
+  companyContext,
 };

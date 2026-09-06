@@ -7,10 +7,25 @@ const authRoutes = require("./routes/authRoutes");
 const interviewRoutes = require("./routes/interviewRoutes");
 const resumeRoutes = require("./routes/resumeRoutes");
 const readinessRoutes = require("./routes/readinessRoutes");
+const companyRoutes = require("./routes/companyRoutes");
+const { seedCompanyProfiles } = require("./models/companyProfile");
 
 const app = express();
 
-connectDB();
+// Seed the AI Recruiter Simulator's company profiles once the DB is up. A seed
+// failure is logged and tolerated: the config module is the read-path fallback,
+// so the simulator still works.
+connectDB()
+  .then(() => seedCompanyProfiles())
+  .then((result) => {
+    if (result)
+      console.log(
+        `Company profiles seeded (${result.total} total, ${result.upserted} new)`,
+      );
+  })
+  .catch((error) => {
+    console.error("Company profile seed failed:", error.message);
+  });
 
 app.use(
   cors({
@@ -24,6 +39,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/interviews", interviewRoutes);
 app.use("/api/resume", resumeRoutes);
 app.use("/api/readiness", readinessRoutes);
+app.use("/api/companies", companyRoutes);
 
 const PORT = process.env.PORT || 5000;
 

@@ -1,10 +1,12 @@
 import {
   BookOpen,
+  Building2,
   ChevronRight,
   CircleCheck,
   CircleHelp,
   Clock,
   Flame,
+  Scale,
   SkipForward,
   Sparkles,
   Sprout,
@@ -29,6 +31,7 @@ import {
   type QuestionPerformance,
   type TopicScore,
 } from "@/lib/interview";
+import { standardVerdict, type CompanyReportSection } from "@/lib/recruiter";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -61,18 +64,25 @@ export default function InterviewReport({
           {domain} · adaptive session
         </Badge>
         <h2 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">
-          Interview Report
+          {report.company
+            ? `${report.company.name} Simulation Report`
+            : "Interview Report"}
         </h2>
 
         <div className="mt-7">
           <ScoreRing score={report.overallScore} />
         </div>
 
-        <p className={cn("mt-6 text-sm font-medium", tone.color)}>{tone.text}</p>
+        <p className={cn("mt-6 text-sm font-medium", tone.color)}>
+          {tone.text}
+        </p>
         {endReason && (
           <p className="mt-2 text-xs text-muted-foreground">{endReason}</p>
         )}
       </Card>
+
+      {/* ── Company verdict (simulator sessions only) ───── */}
+      {report.company && <CompanyVerdictCard company={report.company} />}
 
       {/* ── Stats ──────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -99,11 +109,7 @@ export default function InterviewReport({
           icon={Star}
           tone="primary"
         />
-        <StatCard
-          label="Ended at"
-          value={finalDiff.label}
-          icon={RankIcon}
-        />
+        <StatCard label="Ended at" value={finalDiff.label} icon={RankIcon} />
         <StatCard
           label="Duration"
           value={
@@ -257,7 +263,186 @@ export default function InterviewReport({
   );
 }
 
-// ── Pieces ───────────────────────────────────────────────
+function CompanyVerdictCard({ company }: { company: CompanyReportSection }) {
+  const verdict = standardVerdict(company.meetsStandard);
+  const VerdictIcon = verdict.icon;
+  const standard = company.expectedStandard;
+  const skipPct = Math.round(company.skipRate * 100);
+  const maxSkipPct = Math.round(standard.maxSkipRate * 100);
+
+  return (
+    <div className="space-y-3">
+      <Card
+        className={cn(
+          "gap-0 p-6",
+          company.meetsStandard
+            ? "border-success/25 bg-success/5"
+            : "border-warning/30 bg-warning/5",
+        )}
+      >
+        {/* Who this round simulated */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 text-base font-semibold text-foreground">
+              <Building2 className="size-4 text-muted-foreground" aria-hidden />
+              {company.name}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {[company.roleLabel, company.roundLabel]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          </div>
+          <span
+            className={cn(
+              "inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium",
+              verdict.badge,
+            )}
+          >
+            <VerdictIcon className="size-3.5" aria-hidden />
+            {verdict.label}
+          </span>
+        </div>
+
+        {/* Candidate vs the configured bar */}
+        <div className="mt-6 space-y-4 border-t border-border pt-5">
+          <p className="text-sm font-medium text-foreground">
+            You vs the {standard.label.toLowerCase()}
+          </p>
+          <ScoreLine
+            label="Overall score"
+            detail={`${standard.minOverallScore}/100 expected for this profile`}
+            value={`${company.candidateScore}/100`}
+            pct={company.candidateScore}
+            barClass={
+              company.candidateScore >= standard.minOverallScore
+                ? "bg-success"
+                : "bg-warning"
+            }
+          />
+          <ScoreLine
+            label="Average answer"
+            detail={`${standard.minAverageAnswerScore}/10 expected for this profile`}
+            value={`${company.candidateAverageAnswerScore}/10`}
+            pct={company.candidateAverageAnswerScore * 10}
+            barClass={
+              company.candidateAverageAnswerScore >=
+              standard.minAverageAnswerScore
+                ? "bg-success"
+                : "bg-warning"
+            }
+          />
+          <ScoreLine
+            label="Skipped questions"
+            detail={`up to ${maxSkipPct}% tolerated for this profile`}
+            value={`${skipPct}%`}
+            pct={skipPct}
+            barClass={
+              company.skipRate <= standard.maxSkipRate
+                ? "bg-success"
+                : "bg-warning"
+            }
+          />
+        </div>
+
+        {company.standardGap > 0 && (
+          <p className="mt-5 border-t border-border pt-4 text-sm text-muted-foreground">
+            <span className="font-semibold text-foreground">
+              {company.standardGap} point{company.standardGap === 1 ? "" : "s"}
+            </span>{" "}
+            below this profile&apos;s expected overall score.
+          </p>
+        )}
+
+        {company.companyFeedback && (
+          <p className="mt-5 border-t border-border pt-4 text-sm leading-relaxed text-muted-foreground">
+            {company.companyFeedback}
+          </p>
+        )}
+
+        {company.disclaimer && (
+          <p className="mt-5 border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground">
+            {company.disclaimer}
+          </p>
+        )}
+      </Card>
+
+      {/* What this company weighed */}
+      {company.evaluationCriteria.length > 0 && (
+        <Card className="gap-0 p-6">
+          <p className="flex items-center gap-2 text-base font-semibold text-foreground">
+            <Scale className="size-4 text-muted-foreground" aria-hidden />
+            How {company.name} weighted this round
+          </p>
+          <p className="mt-1 mb-5 text-sm text-muted-foreground">
+            The criteria configured for this profile, and the topics it focuses
+            on.
+          </p>
+          <div className="space-y-4">
+            {company.evaluationCriteria.map((criterion) => (
+              <div key={criterion.label}>
+                <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                  <span className="text-sm font-medium text-foreground">
+                    {criterion.label}
+                  </span>
+                  <span className="tnum text-sm font-semibold text-foreground">
+                    {criterion.weight}%
+                  </span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-border">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-1000"
+                    style={{
+                      width: `${Math.max(0, Math.min(100, criterion.weight))}%`,
+                    }}
+                  />
+                </div>
+                {criterion.description && (
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    {criterion.description}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {company.focusAreas.length > 0 && (
+            <div className="mt-5 flex flex-wrap gap-1.5 border-t border-border pt-4">
+              {company.focusAreas.map((area) => (
+                <Badge key={area} variant="outline" size="sm">
+                  {area}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Gaps against this bar + how to close them */}
+      {(company.improvementAreas.length > 0 ||
+        company.preparationAreas.length > 0) && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {company.improvementAreas.length > 0 && (
+            <BulletPanel
+              title={`Gaps for ${company.name}`}
+              icon={Target}
+              items={company.improvementAreas}
+              dotClass="bg-warning"
+            />
+          )}
+          {company.preparationAreas.length > 0 && (
+            <BulletPanel
+              title="Prepare these next"
+              icon={BookOpen}
+              items={company.preparationAreas}
+              dotClass="bg-primary"
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function ScoreRing({
   score,
@@ -272,7 +457,8 @@ export function ScoreRing({
 }) {
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (Math.max(0, Math.min(100, score)) / 100) * circumference;
+  const offset =
+    circumference - (Math.max(0, Math.min(100, score)) / 100) * circumference;
 
   return (
     <div className="relative mx-auto size-40">
@@ -336,7 +522,10 @@ function ScoreLine({
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-border">
         <div
-          className={cn("h-full rounded-full transition-all duration-1000", barClass)}
+          className={cn(
+            "h-full rounded-full transition-all duration-1000",
+            barClass,
+          )}
           style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
         />
       </div>
@@ -424,7 +613,10 @@ function BulletPanel({
           <li key={i} className="flex gap-2.5 text-sm">
             <span
               aria-hidden
-              className={cn("mt-[7px] size-1.5 shrink-0 rounded-full", dotClass)}
+              className={cn(
+                "mt-[7px] size-1.5 shrink-0 rounded-full",
+                dotClass,
+              )}
             />
             <span className="leading-relaxed text-muted-foreground">
               {item}

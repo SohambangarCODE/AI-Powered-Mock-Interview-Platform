@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Award,
   Brain,
+  Building2,
   Calendar,
   ChartColumn,
   CircleCheck,
@@ -57,8 +58,10 @@ import { cn } from "@/lib/utils";
 
 import { useInterviewHistory } from "@/hooks/useInterviewHistory";
 import { useReadiness } from "@/hooks/useReadiness";
+import { useRecruiter } from "@/hooks/useRecruiter";
 import { InterviewHistoryPanel } from "@/components/dashboard/InterviewHistoryPanel";
 import { ReadinessSummaryPanel } from "@/components/dashboard/ReadinessSummaryPanel";
+import { RecruiterPanel } from "@/components/dashboard/RecruiterPanel";
 
 interface ResumeAnalysis {
   summary: string;
@@ -522,6 +525,7 @@ function ResumePanel({
 
 const TABS = [
   { id: "history", label: "Interview History", icon: ListChecks },
+  { id: "recruiter", label: "AI Recruiter", icon: Building2 },
   { id: "readiness", label: "Placement Readiness", icon: Gauge },
   { id: "resume", label: "Resume Analysis", icon: FileText },
 ] as const;
@@ -532,12 +536,13 @@ const page = () => {
   const [ShowDomainSelector, setShowDomainSelector] = useState(false);
   const [filterDomain, setFilterDomain] = useState<string>("All");
   const [activeTab, setActiveTab] = useState<
-    "history" | "readiness" | "resume"
+    "history" | "recruiter" | "readiness" | "resume"
   >("history");
 
   const { interviews, activeSessions, dataLoading } =
     useInterviewHistory(isLoggedIn);
   const readiness = useReadiness(isLoggedIn && activeTab === "readiness");
+  const recruiter = useRecruiter(isLoggedIn && activeTab === "recruiter");
 
   useEffect(() => {
     if (!authLoading && !isLoggedIn) {
@@ -835,6 +840,18 @@ const page = () => {
                   onStartInterview={() => setShowDomainSelector(true)}
                   limit={5}
                   viewAllHref="/sessions"
+                />
+              )}
+
+              {activeTab === "recruiter" && (
+                <RecruiterPanel
+                  companies={recruiter.companies}
+                  sessions={recruiter.sessions}
+                  loading={recruiter.loading}
+                  loadError={recruiter.loadError}
+                  sessionsError={recruiter.sessionsError}
+                  onRetry={recruiter.reload}
+                  href="/recruiter"
                 />
               )}
 
