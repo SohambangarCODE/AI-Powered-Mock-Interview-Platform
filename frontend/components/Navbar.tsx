@@ -18,6 +18,7 @@ import {
   Sparkles,
   Search,
   Puzzle,
+  Swords,
 } from "lucide-react";
 
 function Navbar() {
@@ -68,10 +69,12 @@ function Navbar() {
       return pathname === "/" && activeSection === path.replace("/#", "");
     }
     if (path === "/sessions") {
-    return pathname === path || pathname.startsWith("/sessions/");
-  }
+      return pathname === path || pathname.startsWith("/sessions/");
+    }
+    if (path === "/arena") {
+      return pathname === path || pathname.startsWith("/arena/");
+    }
     return pathname === path;
-
   };
 
   const handleNavClick = (e: React.MouseEvent<HTMLElement>, href: string) => {
@@ -95,6 +98,7 @@ function Navbar() {
         { href: "/recruiter", label: "Recruiter", icon: Building2 },
         { href: "/sessions", label: "My Sessions", icon: BarChart3 },
         { href: "/readiness", label: "Readiness", icon: Gauge },
+        { href: "/arena", label: "Arena", icon: Swords },
       ]
     : [
         { href: "/#features", label: "Features", icon: Sparkles },

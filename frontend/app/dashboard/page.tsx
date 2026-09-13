@@ -24,6 +24,7 @@ import {
   SkipForward,
   Sparkles,
   Star,
+  Swords,
   Target,
   TrendingUp,
   TriangleAlert,
@@ -62,6 +63,7 @@ import { useRecruiter } from "@/hooks/useRecruiter";
 import { InterviewHistoryPanel } from "@/components/dashboard/InterviewHistoryPanel";
 import { ReadinessSummaryPanel } from "@/components/dashboard/ReadinessSummaryPanel";
 import { RecruiterPanel } from "@/components/dashboard/RecruiterPanel";
+import { ArenaPanel } from "@/components/dashboard/ArenaPanel";
 
 interface ResumeAnalysis {
   summary: string;
@@ -528,6 +530,7 @@ const TABS = [
   { id: "recruiter", label: "AI Recruiter", icon: Building2 },
   { id: "readiness", label: "Placement Readiness", icon: Gauge },
   { id: "resume", label: "Resume Analysis", icon: FileText },
+  { id: "arena", label: "Arena", icon: Swords },
 ] as const;
 
 const page = () => {
@@ -536,7 +539,7 @@ const page = () => {
   const [ShowDomainSelector, setShowDomainSelector] = useState(false);
   const [filterDomain, setFilterDomain] = useState<string>("All");
   const [activeTab, setActiveTab] = useState<
-    "history" | "recruiter" | "readiness" | "resume"
+    "history" | "recruiter" | "readiness" | "resume" | "arena"
   >("history");
 
   const { interviews, activeSessions, dataLoading } =
@@ -870,6 +873,8 @@ const page = () => {
               {activeTab === "resume" && (
                 <ResumePanel onDomainSelect={handleSelectDomain} />
               )}
+
+              {activeTab === "arena" && <ArenaPanel />}
             </section>
           </div>
         </div>

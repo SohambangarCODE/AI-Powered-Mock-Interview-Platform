@@ -8,6 +8,8 @@ const interviewRoutes = require("./routes/interviewRoutes");
 const resumeRoutes = require("./routes/resumeRoutes");
 const readinessRoutes = require("./routes/readinessRoutes");
 const companyRoutes = require("./routes/companyRoutes");
+const arenaRoutes = require("./routes/arenaRoutes");
+const { seedDailyChallenges, seedWeeklyChallenges } = require("./controllers/arenaController");
 const { seedCompanyProfiles } = require("./models/companyProfile");
 
 const app = express();
@@ -27,6 +29,18 @@ connectDB()
     console.error("Company profile seed failed:", error.message);
   });
 
+// Seed arena challenges (non-blocking — a failure logs and is tolerated).
+connectDB()
+  .then(() => Promise.all([seedDailyChallenges(), seedWeeklyChallenges()]))
+  .then(([daily, weekly]) => {
+    console.log(
+      `Arena challenges seeded — daily: ${daily.created} new, weekly: ${weekly.created} new`,
+    );
+  })
+  .catch((error) => {
+    console.error("Arena challenge seed failed:", error.message);
+  });
+
 app.use(
   cors({
     origin: "*",
@@ -40,6 +54,7 @@ app.use("/api/interviews", interviewRoutes);
 app.use("/api/resume", resumeRoutes);
 app.use("/api/readiness", readinessRoutes);
 app.use("/api/companies", companyRoutes);
+app.use("/api/arena", arenaRoutes);
 
 const PORT = process.env.PORT || 5000;
 
