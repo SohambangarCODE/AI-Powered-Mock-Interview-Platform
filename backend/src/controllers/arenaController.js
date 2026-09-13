@@ -137,29 +137,52 @@ const startChallenge = async (req, res) => {
       });
     }
 
-    attempt = await ChallengeAttempt.create({
-      userId: req.userId,
-      challengeId: challenge._id,
-      category: challenge.category,
-      difficulty: challenge.difficulty,
-      type: challenge.type,
-      title: challenge.title,
-    });
-
-    res.status(201).json({
-      attemptId: attempt._id,
-      status: attempt.status,
-      alreadyStarted: false,
-      challenge: {
-        id: challenge._id,
-        title: challenge.title,
+    // ── Find-or-create with race-condition safety ──────────
+    // Two requests can arrive simultaneously (e.g. React Strict Mode
+    // double-fires useEffect in development, or a user double-clicks).
+    // Both pass the findOne check above before either write commits, then
+    // both try create() — the loser hits the unique index (E11000).
+    // We catch that specific error and fetch the document the winner created.
+    let isNew = true;
+    try {
+      attempt = await ChallengeAttempt.create({
+        userId: req.userId,
+        challengeId: challenge._id,
         category: challenge.category,
         difficulty: challenge.difficulty,
         type: challenge.type,
-        questions: challenge.questions,
-        questionCount: challenge.questionCount,
-        expiresAt: challenge.expiresAt,
-      },
+        title: challenge.title,
+      });
+    } catch (createErr) {
+      if (createErr.code === 11000) {
+        // Duplicate key — the concurrent request already created the attempt.
+        attempt = await ChallengeAttempt.findOne({
+          userId: req.userId,
+          challengeId: challenge._id,
+        });
+        if (!attempt) throw createErr; // should never happen, but be safe
+        isNew = false;
+      } else {
+        throw createErr; // genuine error — re-throw so outer catch handles it
+      }
+    }
+
+    const challengePayload = {
+      id: challenge._id,
+      title: challenge.title,
+      category: challenge.category,
+      difficulty: challenge.difficulty,
+      type: challenge.type,
+      questions: challenge.questions,
+      questionCount: challenge.questionCount,
+      expiresAt: challenge.expiresAt,
+    };
+
+    res.status(isNew ? 201 : 200).json({
+      attemptId: attempt._id,
+      status: attempt.status,
+      alreadyStarted: !isNew || attempt.status === "completed",
+      challenge: challengePayload,
     });
   } catch (err) {
     console.error("startChallenge error:", err);
