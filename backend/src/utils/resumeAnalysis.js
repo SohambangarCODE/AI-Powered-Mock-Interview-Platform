@@ -1,19 +1,3 @@
-/**
- * Resume text extraction + AI analysis, shared by two callers:
- *
- *  - POST /api/resume/analyze  — the dashboard's domain-recommendation panel.
- *    Returns exactly the fields it has always returned.
- *  - POST /api/readiness/resume — the readiness engine, which additionally
- *    needs structured skills / projects / experience / certifications /
- *    education.
- *
- * Both go through one AI call. The two field sets are split apart afterwards by
- * separate sanitisers, so the dashboard's contract is enforced by code rather
- * than by the prompt: whatever the model returns, it gets exactly the five
- * fields it has always got, and the extra structured fields degrade to empty
- * without failing the upload.
- */
-
 const { PDFParse } = require("pdf-parse");
 const { askForJSONStrict } = require("./aiClient");
 const { INTERVIEW_DOMAINS } = require("../config/readinessConfig");
@@ -32,12 +16,14 @@ const MIN_USABLE_LENGTH = 50;
  * silently returns undefined text instead of throwing.)
  */
 async function extractTextFromPDF(buffer) {
+  const { PDFParse } = await import("pdf-parse");
+
   const parser = new PDFParse({ data: buffer });
+
   try {
     const result = await parser.getText();
     return result?.text || "";
   } finally {
-    // Always release the parser's resources, even if getText() throws.
     await parser.destroy();
   }
 }

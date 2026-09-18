@@ -14,9 +14,6 @@ const { seedCompanyProfiles } = require("./models/companyProfile");
 
 const app = express();
 
-// Seed the AI Recruiter Simulator's company profiles once the DB is up. A seed
-// failure is logged and tolerated: the config module is the read-path fallback,
-// so the simulator still works.
 connectDB()
   .then(() => seedCompanyProfiles())
   .then((result) => {
@@ -29,7 +26,6 @@ connectDB()
     console.error("Company profile seed failed:", error.message);
   });
 
-// Seed arena challenges (non-blocking — a failure logs and is tolerated).
 connectDB()
   .then(() => Promise.all([seedDailyChallenges(), seedWeeklyChallenges()]))
   .then(([daily, weekly]) => {
