@@ -19,6 +19,7 @@ import {
   Search,
   Puzzle,
   Swords,
+  Settings,
 } from "lucide-react";
 
 function Navbar() {
@@ -99,6 +100,7 @@ function Navbar() {
         { href: "/sessions", label: "My Sessions", icon: BarChart3 },
         { href: "/readiness", label: "Readiness", icon: Gauge },
         { href: "/arena", label: "Arena", icon: Swords },
+        { href: "/settings", label: "Settings", icon: Settings },
       ]
     : [
         { href: "/#features", label: "Features", icon: Sparkles },

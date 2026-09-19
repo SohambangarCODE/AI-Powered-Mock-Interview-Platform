@@ -65,7 +65,6 @@ import { InterviewHistoryPanel } from "@/components/dashboard/InterviewHistoryPa
 import { ReadinessSummaryPanel } from "@/components/dashboard/ReadinessSummaryPanel";
 import { RecruiterPanel } from "@/components/dashboard/RecruiterPanel";
 import { ArenaPanel } from "@/components/dashboard/ArenaPanel";
-import { SecurityPanel } from "@/components/dashboard/SecurityPanel";
 
 interface ResumeAnalysis {
   summary: string;
@@ -542,7 +541,7 @@ const page = () => {
   const [ShowDomainSelector, setShowDomainSelector] = useState(false);
   const [filterDomain, setFilterDomain] = useState<string>("All");
   const [activeTab, setActiveTab] = useState<
-    "history" | "recruiter" | "readiness" | "resume" | "arena" | "security"
+    "history" | "recruiter" | "readiness" | "resume" | "arena"
   >("history");
 
   const { interviews, activeSessions, dataLoading } =
@@ -650,7 +649,13 @@ const page = () => {
                     <button
                       key={tab.id}
                       type="button"
-                      onClick={() => setActiveTab(tab.id)}
+                      onClick={() => {
+                        if (tab.id === "security") {
+                          router.push("/settings");
+                        } else {
+                          setActiveTab(tab.id as any);
+                        }
+                      }}
                       aria-current={active ? "true" : undefined}
                       className={cn(
                         "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
@@ -822,7 +827,13 @@ const page = () => {
                     <button
                       key={tab.id}
                       type="button"
-                      onClick={() => setActiveTab(tab.id)}
+                      onClick={() => {
+                        if (tab.id === "security") {
+                          router.push("/settings");
+                        } else {
+                          setActiveTab(tab.id as any);
+                        }
+                      }}
                       aria-current={active ? "true" : undefined}
                       className={cn(
                         "-mb-px flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
@@ -878,8 +889,6 @@ const page = () => {
               )}
 
               {activeTab === "arena" && <ArenaPanel />}
-
-              {activeTab === "security" && <SecurityPanel />}
             </section>
           </div>
         </div>
