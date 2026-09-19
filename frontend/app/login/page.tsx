@@ -43,8 +43,12 @@ const page = () => {
       // Specific error messages from backend
       if (err?.response?.data?.message) {
         setError(err.response.data.message);
-      } else if (err?.response?.status === 400) {
+      } else if (err?.response?.status === 423) {
+        setError("Account temporarily locked due to too many failed attempts.");
+      } else if (err?.response?.status === 401) {
         setError("Invalid credentials. Please check your email and password.");
+      } else if (err?.response?.status === 429) {
+        setError("Too many login attempts. Please wait a few minutes before trying again.");
       } else if (err?.response?.status === 500) {
         setError("Server error. Please try again later.");
       } else {
@@ -88,7 +92,15 @@ const page = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <Link
+                    href="/forgot-password"
+                    className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
                 <Input
                   type="password"
                   id="password"

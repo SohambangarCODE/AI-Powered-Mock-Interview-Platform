@@ -5,10 +5,12 @@ export interface StoredUser {
     id: string;
     name: string;
     email: string;
-    createdAt: string;
+    isEmailVerified: boolean;
+    createdAt?: string;
+    lastPasswordChange?: string;
 }
 
-// ── Token ─────────────────────────────────────────────────
+// ── Token ─────────────────────────────────────────────────────────────────────
 export const getToken = (): string | null => {
     if (typeof window === 'undefined') return null;
     return localStorage.getItem(TOKEN_KEY);
@@ -22,7 +24,7 @@ export const removeToken = (): void => {
     localStorage.removeItem(TOKEN_KEY);
 };
 
-// ── User ──────────────────────────────────────────────────
+// ── User ──────────────────────────────────────────────────────────────────────
 export const getStoredUser = (): StoredUser | null => {
     if (typeof window === 'undefined') return null;
     try {
@@ -41,7 +43,7 @@ export const removeStoredUser = (): void => {
     localStorage.removeItem(USER_KEY);
 };
 
-// ── Combined ──────────────────────────────────────────────
+// ── Combined ──────────────────────────────────────────────────────────────────
 export const clearAuth = (): void => {
     removeToken();
     removeStoredUser();

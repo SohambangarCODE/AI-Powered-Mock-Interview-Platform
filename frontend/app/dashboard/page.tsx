@@ -21,6 +21,7 @@ import {
   Plus,
   RotateCcw,
   ScanSearch,
+  ShieldCheck,
   SkipForward,
   Sparkles,
   Star,
@@ -64,6 +65,7 @@ import { InterviewHistoryPanel } from "@/components/dashboard/InterviewHistoryPa
 import { ReadinessSummaryPanel } from "@/components/dashboard/ReadinessSummaryPanel";
 import { RecruiterPanel } from "@/components/dashboard/RecruiterPanel";
 import { ArenaPanel } from "@/components/dashboard/ArenaPanel";
+import { SecurityPanel } from "@/components/dashboard/SecurityPanel";
 
 interface ResumeAnalysis {
   summary: string;
@@ -531,6 +533,7 @@ const TABS = [
   { id: "readiness", label: "Placement Readiness", icon: Gauge },
   { id: "resume", label: "Resume Analysis", icon: FileText },
   { id: "arena", label: "Arena", icon: Swords },
+  { id: "security", label: "Security", icon: ShieldCheck },
 ] as const;
 
 const page = () => {
@@ -539,7 +542,7 @@ const page = () => {
   const [ShowDomainSelector, setShowDomainSelector] = useState(false);
   const [filterDomain, setFilterDomain] = useState<string>("All");
   const [activeTab, setActiveTab] = useState<
-    "history" | "recruiter" | "readiness" | "resume" | "arena"
+    "history" | "recruiter" | "readiness" | "resume" | "arena" | "security"
   >("history");
 
   const { interviews, activeSessions, dataLoading } =
@@ -875,6 +878,8 @@ const page = () => {
               )}
 
               {activeTab === "arena" && <ArenaPanel />}
+
+              {activeTab === "security" && <SecurityPanel />}
             </section>
           </div>
         </div>
