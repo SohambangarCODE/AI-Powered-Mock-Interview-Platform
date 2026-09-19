@@ -2,7 +2,6 @@
 
 import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck } from "lucide-react";
 import { SecurityPanel } from "@/components/dashboard/SecurityPanel";
 import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/ui/page-header";
@@ -32,9 +31,8 @@ const SettingsPage = () => {
     <div className="flex min-h-[calc(100dvh-4rem)] flex-col bg-background">
       <div className="mx-auto w-full max-w-7xl flex-1 space-y-8 p-4 md:p-8">
         <PageHeader
-          heading="Settings"
+          title="Settings"
           description="Manage your account security and preferences."
-          icon={ShieldCheck}
         />
         
         <div className="grid gap-8">
