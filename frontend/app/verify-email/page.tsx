@@ -13,14 +13,14 @@ import {
 } from "@/components/ui/card";
 import { Logo } from "@/components/Logo";
 import Link from "next/link";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { CircleAlert, CircleCheck, Mail, RefreshCw } from "lucide-react";
 import { verifyEmail, resendVerification } from "@/lib/security";
 import { useSearchParams, useRouter } from "next/navigation";
 
 type Step = "pending" | "verifying" | "success" | "error";
 
-const VerifyEmailPage = () => {
+const VerifyEmailContent = () => {
     const searchParams = useSearchParams();
     const router = useRouter();
 
@@ -243,4 +243,14 @@ const VerifyEmailPage = () => {
     );
 };
 
-export default VerifyEmailPage;
+export default function VerifyEmailPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center">
+                <p className="text-sm text-muted-foreground">Loading...</p>
+            </div>
+        }>
+            <VerifyEmailContent />
+        </Suspense>
+    );
+}

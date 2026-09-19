@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Logo } from "@/components/Logo";
 import Link from "next/link";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import {
     CircleAlert,
     CircleCheck,
@@ -81,7 +81,7 @@ function PasswordStrength({ password }: { password: string }) {
     );
 }
 
-const ResetPasswordPage = () => {
+const ResetPasswordContent = () => {
     const searchParams = useSearchParams();
     const router = useRouter();
 
@@ -299,4 +299,14 @@ const ResetPasswordPage = () => {
     );
 };
 
-export default ResetPasswordPage;
+export default function ResetPasswordPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center">
+                <p className="text-sm text-muted-foreground">Loading...</p>
+            </div>
+        }>
+            <ResetPasswordContent />
+        </Suspense>
+    );
+}
