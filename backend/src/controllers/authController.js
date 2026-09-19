@@ -19,8 +19,8 @@ const registerUser = async (req, res) => {
     }
 
     const newUser = new user({ name, email, password });
-    const token = signToken( newUser._id);
     await newUser.save();
+    const token = signToken( newUser._id);
 
     res
       .status(201)

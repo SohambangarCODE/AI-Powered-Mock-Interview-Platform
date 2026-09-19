@@ -1,5 +1,4 @@
 const express = require("express");
-const mongoose = require("mongoose");
 require("dotenv").config();
 
 const cors = require("cors");
@@ -32,29 +31,6 @@ app.use(
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-/* -------------------- Routes -------------------- */
-
-app.use("/api/auth", authRoutes);
-app.use("/api/interviews", interviewRoutes);
-app.use("/api/resume", resumeRoutes);
-app.use("/api/readiness", readinessRoutes);
-app.use("/api/companies", companyRoutes);
-app.use("/api/arena", arenaRoutes);
-
-/* -------------------- Health Routes -------------------- */
-
-app.get("/", (req, res) => {
-  res.send("backend is alive");
-});
-
-app.get("/health", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Server is healthy",
-    timestamp: new Date().toISOString(),
-  });
-});
 
 /* -------------------- Database + Seeding -------------------- */
 
@@ -96,7 +72,11 @@ const initializeApp = async () => {
         }
       })
       .catch((error) => {
-        console.error("Database initialization failed:", error.message);
+        console.error(
+          "Database initialization failed:",
+          error.message,
+        );
+
         throw error;
       });
   }
@@ -104,7 +84,7 @@ const initializeApp = async () => {
   return initializationPromise;
 };
 
-/* -------------------- Vercel Handler -------------------- */
+/* -------------------- Vercel Initialization -------------------- */
 
 app.use(async (req, res, next) => {
   try {
@@ -114,6 +94,31 @@ app.use(async (req, res, next) => {
     next(error);
   }
 });
+
+/* -------------------- Routes -------------------- */
+
+app.use("/api/auth", authRoutes);
+app.use("/api/interviews", interviewRoutes);
+app.use("/api/resume", resumeRoutes);
+app.use("/api/readiness", readinessRoutes);
+app.use("/api/companies", companyRoutes);
+app.use("/api/arena", arenaRoutes);
+
+/* -------------------- Health Routes -------------------- */
+
+app.get("/", (req, res) => {
+  res.send("backend is alive");
+});
+
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Server is healthy",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+/* -------------------- Export for Vercel -------------------- */
 
 module.exports = app;
 
