@@ -1,3 +1,4 @@
+require("pdf-parse/worker");
 const { PDFParse } = require("pdf-parse");
 const { askForJSONStrict } = require("./aiClient");
 const { INTERVIEW_DOMAINS } = require("../config/readinessConfig");
