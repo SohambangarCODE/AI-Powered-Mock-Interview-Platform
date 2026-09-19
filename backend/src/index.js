@@ -12,13 +12,6 @@ const readinessRoutes = require("./routes/readinessRoutes");
 const companyRoutes = require("./routes/companyRoutes");
 const arenaRoutes = require("./routes/arenaRoutes");
 
-const {
-  seedDailyChallenges,
-  seedWeeklyChallenges,
-} = require("./controllers/arenaController");
-
-const { seedCompanyProfiles } = require("./models/companyProfile");
-
 const app = express();
 
 /* -------------------- Middleware -------------------- */
@@ -32,82 +25,10 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/* -------------------- Database + Seeding -------------------- */
-
-let initializationPromise;
-
-const initializeApp = async () => {
-  if (!initializationPromise) {
-    initializationPromise = connectDB()
-      .then(async () => {
-        try {
-          const companyResult = await seedCompanyProfiles();
-
-          if (companyResult) {
-            console.log(
-              `Company profiles seeded (${companyResult.total} total, ${companyResult.upserted} new)`,
-            );
-          }
-        } catch (error) {
-          console.error(
-            "Company profile seed failed:",
-            error.message,
-          );
-        }
-
-        try {
-          const [daily, weekly] = await Promise.all([
-            seedDailyChallenges(),
-            seedWeeklyChallenges(),
-          ]);
-
-          console.log(
-            `Arena challenges seeded — daily: ${daily.created} new, weekly: ${weekly.created} new`,
-          );
-        } catch (error) {
-          console.error(
-            "Arena challenge seed failed:",
-            error.message,
-          );
-        }
-      })
-      .catch((error) => {
-        console.error(
-          "Database initialization failed:",
-          error.message,
-        );
-
-        throw error;
-      });
-  }
-
-  return initializationPromise;
-};
-
-/* -------------------- Vercel Initialization -------------------- */
-
-app.use(async (req, res, next) => {
-  try {
-    await initializeApp();
-    next();
-  } catch (error) {
-    next(error);
-  }
-});
-
-/* -------------------- Routes -------------------- */
-
-app.use("/api/auth", authRoutes);
-app.use("/api/interviews", interviewRoutes);
-app.use("/api/resume", resumeRoutes);
-app.use("/api/readiness", readinessRoutes);
-app.use("/api/companies", companyRoutes);
-app.use("/api/arena", arenaRoutes);
-
 /* -------------------- Health Routes -------------------- */
 
 app.get("/", (req, res) => {
-  res.send("backend is alive");
+  res.status(200).send("backend is alive");
 });
 
 app.get("/health", (req, res) => {
@@ -118,7 +39,56 @@ app.get("/health", (req, res) => {
   });
 });
 
-/* -------------------- Export for Vercel -------------------- */
+/* -------------------- Database Middleware -------------------- */
+
+let dbConnectionPromise;
+
+const ensureDatabaseConnection = async (req, res, next) => {
+  try {
+    if (!dbConnectionPromise) {
+      dbConnectionPromise = connectDB();
+    }
+
+    await dbConnectionPromise;
+
+    next();
+  } catch (error) {
+    console.error("Database connection failed:", error);
+
+    dbConnectionPromise = null;
+
+    res.status(500).json({
+      success: false,
+      message: "Database connection failed",
+    });
+  }
+};
+
+/* -------------------- API Routes -------------------- */
+
+app.use("/api/auth", ensureDatabaseConnection, authRoutes);
+app.use("/api/interviews", ensureDatabaseConnection, interviewRoutes);
+app.use("/api/resume", ensureDatabaseConnection, resumeRoutes);
+app.use("/api/readiness", ensureDatabaseConnection, readinessRoutes);
+app.use("/api/companies", ensureDatabaseConnection, companyRoutes);
+app.use("/api/arena", ensureDatabaseConnection, arenaRoutes);
+
+/* -------------------- Error Handler -------------------- */
+
+app.use((err, req, res, next) => {
+  console.error("Unhandled application error:", err);
+
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  res.status(500).json({
+    success: false,
+    message: "Internal server error",
+  });
+});
+
+/* -------------------- Vercel Export -------------------- */
 
 module.exports = app;
 
@@ -127,7 +97,7 @@ module.exports = app;
 if (require.main === module) {
   const PORT = process.env.PORT || 5000;
 
-  initializeApp()
+  connectDB()
     .then(() => {
       app.listen(PORT, () => {
         console.log(`Server is running on port ${PORT}`);
