@@ -419,7 +419,10 @@ async function analyzeResumeFully(resumeText) {
     console.warn(
       "Combined resume analysis was unusable; retrying with the core prompt only",
     );
-    return { core: await analyzeResumeCore(resumeText), structured: emptyStructured() };
+    return {
+      core: await analyzeResumeCore(resumeText),
+      structured: emptyStructured(),
+    };
   }
 
   // Never fatal: a reply that carried the summary but lost the skill list still

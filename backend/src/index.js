@@ -1,49 +1,39 @@
 const express = require("express");
 const mongoose = require("mongoose");
 require("dotenv").config();
+
 const cors = require("cors");
+
 const connectDB = require("./config/db");
+
 const authRoutes = require("./routes/authRoutes");
 const interviewRoutes = require("./routes/interviewRoutes");
 const resumeRoutes = require("./routes/resumeRoutes");
 const readinessRoutes = require("./routes/readinessRoutes");
 const companyRoutes = require("./routes/companyRoutes");
 const arenaRoutes = require("./routes/arenaRoutes");
-const { seedDailyChallenges, seedWeeklyChallenges } = require("./controllers/arenaController");
+
+const {
+  seedDailyChallenges,
+  seedWeeklyChallenges,
+} = require("./controllers/arenaController");
+
 const { seedCompanyProfiles } = require("./models/companyProfile");
 
 const app = express();
 
-connectDB()
-  .then(() => seedCompanyProfiles())
-  .then((result) => {
-    if (result)
-      console.log(
-        `Company profiles seeded (${result.total} total, ${result.upserted} new)`,
-      );
-  })
-  .catch((error) => {
-    console.error("Company profile seed failed:", error.message);
-  });
-
-connectDB()
-  .then(() => Promise.all([seedDailyChallenges(), seedWeeklyChallenges()]))
-  .then(([daily, weekly]) => {
-    console.log(
-      `Arena challenges seeded — daily: ${daily.created} new, weekly: ${weekly.created} new`,
-    );
-  })
-  .catch((error) => {
-    console.error("Arena challenge seed failed:", error.message);
-  });
+/* -------------------- Middleware -------------------- */
 
 app.use(
   cors({
     origin: "*",
   }),
 );
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+/* -------------------- Routes -------------------- */
 
 app.use("/api/auth", authRoutes);
 app.use("/api/interviews", interviewRoutes);
@@ -52,7 +42,7 @@ app.use("/api/readiness", readinessRoutes);
 app.use("/api/companies", companyRoutes);
 app.use("/api/arena", arenaRoutes);
 
-const PORT = process.env.PORT || 5000;
+/* -------------------- Health Routes -------------------- */
 
 app.get("/", (req, res) => {
   res.send("backend is alive");
@@ -66,6 +56,80 @@ app.get("/health", (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+/* -------------------- Database + Seeding -------------------- */
+
+let initializationPromise;
+
+const initializeApp = async () => {
+  if (!initializationPromise) {
+    initializationPromise = connectDB()
+      .then(async () => {
+        try {
+          const companyResult = await seedCompanyProfiles();
+
+          if (companyResult) {
+            console.log(
+              `Company profiles seeded (${companyResult.total} total, ${companyResult.upserted} new)`,
+            );
+          }
+        } catch (error) {
+          console.error(
+            "Company profile seed failed:",
+            error.message,
+          );
+        }
+
+        try {
+          const [daily, weekly] = await Promise.all([
+            seedDailyChallenges(),
+            seedWeeklyChallenges(),
+          ]);
+
+          console.log(
+            `Arena challenges seeded — daily: ${daily.created} new, weekly: ${weekly.created} new`,
+          );
+        } catch (error) {
+          console.error(
+            "Arena challenge seed failed:",
+            error.message,
+          );
+        }
+      })
+      .catch((error) => {
+        console.error("Database initialization failed:", error.message);
+        throw error;
+      });
+  }
+
+  return initializationPromise;
+};
+
+/* -------------------- Vercel Handler -------------------- */
+
+app.use(async (req, res, next) => {
+  try {
+    await initializeApp();
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
+
+module.exports = app;
+
+/* -------------------- Local Development -------------------- */
+
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+
+  initializeApp()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+      });
+    })
+    .catch((error) => {
+      console.error("Failed to start server:", error);
+      process.exit(1);
+    });
+}
