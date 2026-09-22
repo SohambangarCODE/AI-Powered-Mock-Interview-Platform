@@ -13,6 +13,8 @@ const resumeRoutes = require("./routes/resumeRoutes");
 const readinessRoutes = require("./routes/readinessRoutes");
 const companyRoutes = require("./routes/companyRoutes");
 const arenaRoutes = require("./routes/arenaRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const mentorRoutes = require("./routes/mentorRoutes");
 
 const app = express();
 
@@ -94,12 +96,14 @@ const ensureDatabaseConnection = async (req, res, next) => {
 /* -------------------- API Routes -------------------------------------------- */
 
 // authRateLimiter is applied per-route inside authRoutes.js (login/register only)
-app.use("/api/auth", ensureDatabaseConnection, authRoutes);
+app.use("/api/auth",       ensureDatabaseConnection, authRoutes);
 app.use("/api/interviews", ensureDatabaseConnection, interviewRoutes);
-app.use("/api/resume", ensureDatabaseConnection, resumeRoutes);
-app.use("/api/readiness", ensureDatabaseConnection, readinessRoutes);
-app.use("/api/companies", ensureDatabaseConnection, companyRoutes);
-app.use("/api/arena", ensureDatabaseConnection, arenaRoutes);
+app.use("/api/resume",     ensureDatabaseConnection, resumeRoutes);
+app.use("/api/readiness",  ensureDatabaseConnection, readinessRoutes);
+app.use("/api/companies",  ensureDatabaseConnection, companyRoutes);
+app.use("/api/arena",      ensureDatabaseConnection, arenaRoutes);
+app.use("/api/admin",      ensureDatabaseConnection, adminRoutes);
+app.use("/api/mentor",     ensureDatabaseConnection, mentorRoutes);
 
 /* -------------------- Error Handler ----------------------------------------- */
 

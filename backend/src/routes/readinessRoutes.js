@@ -4,6 +4,7 @@ const path = require("path");
 const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
+const { requirePermission } = require("../middleware/rbacMiddleware");
 const {
   getConfig,
   uploadResume,
@@ -77,14 +78,15 @@ const acceptResume = (req, res, next) => {
 // Every route requires a valid token — same middleware as the rest of the app.
 router.use(authMiddleware);
 
-router.get("/config", getConfig);
-router.get("/latest", getLatest);
-router.get("/history", getHistory);
-router.post("/resume", acceptResume, uploadResume);
-router.post("/generate", generateAssessment);
+// All readiness routes require readiness.read permission (Student role)
+router.get("/config",              requirePermission("readiness.read"),  getConfig);
+router.get("/latest",              requirePermission("readiness.read"),  getLatest);
+router.get("/history",             requirePermission("readiness.read"),  getHistory);
+router.post("/resume",             requirePermission("readiness.read"),  acceptResume, uploadResume);
+router.post("/generate",           requirePermission("readiness.read"),  generateAssessment);
 
-router.get("/assessment", getSkillAssessments);
-router.post("/assessment/start", startSkillAssessment);
-router.post("/assessment/submit", submitSkillAssessment);
+router.get("/assessment",          requirePermission("readiness.read"),  getSkillAssessments);
+router.post("/assessment/start",   requirePermission("readiness.read"),  startSkillAssessment);
+router.post("/assessment/submit",  requirePermission("readiness.read"),  submitSkillAssessment);
 
 module.exports = router;

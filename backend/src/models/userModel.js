@@ -46,6 +46,14 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+
+  // ── Role ──────────────────────────────────────────────────────────────────
+  // Centralised in rolesConfig.js — never change via normal profile APIs.
+  role: {
+    type: String,
+    enum: ["Student", "Mentor", "Administrator"],
+    default: "Student",
+  },
 });
 
 // ── Pre-save: hash password when modified ─────────────────────────────────────

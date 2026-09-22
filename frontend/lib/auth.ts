@@ -5,6 +5,7 @@ export interface StoredUser {
     id: string;
     name: string;
     email: string;
+    role?: 'Student' | 'Mentor' | 'Administrator';
     isEmailVerified: boolean;
     createdAt?: string;
     lastPasswordChange?: string;

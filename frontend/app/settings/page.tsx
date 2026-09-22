@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SecurityPanel } from "@/components/dashboard/SecurityPanel";
 import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/ui/page-header";
 import { LoadingState } from "@/components/ui/spinner";
+import { RoleSwitcher } from "@/components/RoleSwitcher";
 
 const SettingsPage = () => {
   const router = useRouter();
@@ -34,8 +35,10 @@ const SettingsPage = () => {
           title="Settings"
           description="Manage your account security and preferences."
         />
-        
+
         <div className="grid gap-8">
+          {/* Role Switcher — try all three dashboards */}
+          <RoleSwitcher />
           <SecurityPanel />
         </div>
       </div>

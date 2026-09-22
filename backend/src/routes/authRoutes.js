@@ -17,6 +17,7 @@ const {
   revokeSessionHandler,
   revokeOtherSessions,
   getLoginHistory,
+  switchRole,
 } = require("../controllers/authController");
 
 const authMiddleware = require("../middleware/authMiddleware");
@@ -52,5 +53,8 @@ router.delete("/sessions/:sessionId", authMiddleware, revokeSessionHandler);
 
 // Security / login history
 router.get("/login-history", authMiddleware, getLoginHistory);
+
+// Role switching (dev / demo — any authenticated user)
+router.patch("/me/role", authMiddleware, switchRole);
 
 module.exports = router;

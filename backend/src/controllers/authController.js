@@ -115,6 +115,7 @@ const registerUser = async (req, res) => {
         id: newUser._id,
         name: newUser.name,
         email: newUser.email,
+        role: newUser.role,
         isEmailVerified: false,
       },
       requiresVerification: true,
@@ -220,6 +221,7 @@ const loginUser = async (req, res) => {
         id: existingUser._id,
         name: existingUser.name,
         email: existingUser.email,
+        role: existingUser.role,
         isEmailVerified: existingUser.isEmailVerified,
         createdAt: existingUser.createdAt,
       },
@@ -242,6 +244,7 @@ const getMe = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        role: user.role,
         isEmailVerified: user.isEmailVerified,
         createdAt: user.createdAt,
         lastPasswordChange: user.lastPasswordChange,
@@ -273,6 +276,7 @@ const getUserProfile = async (req, res) => {
         id: existingUser._id,
         name: existingUser.name,
         email: existingUser.email,
+        role: existingUser.role,
         isEmailVerified: existingUser.isEmailVerified,
       },
     });
@@ -684,6 +688,40 @@ const getLoginHistory = async (req, res) => {
   }
 };
 
+// ── Switch own role (dev / demo) ──────────────────────────────────────────────
+// Allows any authenticated user to switch their own role without needing an
+// Administrator account. Useful for development and multi-role demos.
+const switchRole = async (req, res) => {
+  try {
+    const { role } = req.body;
+    const validRoles = ["Student", "Mentor", "Administrator"];
+
+    if (!role || !validRoles.includes(role)) {
+      return res.status(400).json({
+        message: `Invalid role. Valid options: ${validRoles.join(", ")}.`,
+      });
+    }
+
+    const user = req.user;
+    user.role = role;
+    await user.save();
+
+    res.json({
+      message: `Role switched to ${role}.`,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified,
+      },
+    });
+  } catch (err) {
+    console.error("switchRole error:", err);
+    res.status(500).json({ message: "Failed to switch role.", error: err.message });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -700,4 +738,5 @@ module.exports = {
   revokeSessionHandler,
   revokeOtherSessions,
   getLoginHistory,
+  switchRole,
 };

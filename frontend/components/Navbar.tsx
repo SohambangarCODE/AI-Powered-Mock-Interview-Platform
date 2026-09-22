@@ -20,11 +20,46 @@ import {
   Puzzle,
   Swords,
   Settings,
+  Users,
+  MessageSquare,
+  LineChart,
+  ShieldCheck,
 } from "lucide-react";
+
+// ── Role-based nav link definitions ──────────────────────────────────────────
+const STUDENT_LINKS = [
+  { href: "/dashboard",  label: "Dashboard",   icon: LayoutDashboard },
+  { href: "/interview",  label: "Practice",     icon: Target },
+  { href: "/recruiter",  label: "Recruiter",    icon: Building2 },
+  { href: "/sessions",   label: "My Sessions",  icon: BarChart3 },
+  { href: "/readiness",  label: "Readiness",    icon: Gauge },
+  { href: "/arena",      label: "Arena",        icon: Swords },
+  { href: "/settings",   label: "Settings",     icon: Settings },
+];
+
+const MENTOR_LINKS = [
+  { href: "/dashboard",  label: "Dashboard",   icon: LayoutDashboard },
+  { href: "/mentor",     label: "My Students",  icon: Users },
+  { href: "/settings",   label: "Settings",     icon: Settings },
+];
+
+const ADMIN_LINKS = [
+  { href: "/dashboard",        label: "Dashboard",  icon: LayoutDashboard },
+  { href: "/admin",            label: "Admin",       icon: ShieldCheck },
+  { href: "/admin/users",      label: "Users",       icon: Users },
+  { href: "/admin/analytics",  label: "Analytics",   icon: LineChart },
+  { href: "/settings",         label: "Settings",    icon: Settings },
+];
+
+const PUBLIC_LINKS = [
+  { href: "/#features",     label: "Features",    icon: Sparkles },
+  { href: "/#how-it-works", label: "How It Works", icon: Search },
+  { href: "/#domains",      label: "Domains",     icon: Puzzle },
+];
 
 function Navbar() {
   const pathname = usePathname();
-  const { user, isLoggedIn, logout } = useAuth();
+  const { user, isLoggedIn, logout, role } = useAuth();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -75,8 +110,29 @@ function Navbar() {
     if (path === "/arena") {
       return pathname === path || pathname.startsWith("/arena/");
     }
+    if (path === "/admin") {
+      return pathname === "/admin";
+    }
+    if (path === "/admin/users") {
+      return pathname === "/admin/users" || pathname.startsWith("/admin/users/");
+    }
+    if (path === "/admin/analytics") {
+      return pathname === "/admin/analytics";
+    }
+    if (path === "/mentor") {
+      return pathname === "/mentor" || pathname.startsWith("/mentor/");
+    }
     return pathname === path;
   };
+
+  // Resolve nav links based on role
+  const navLinks = !isLoggedIn
+    ? PUBLIC_LINKS
+    : role === "Administrator"
+    ? ADMIN_LINKS
+    : role === "Mentor"
+    ? MENTOR_LINKS
+    : STUDENT_LINKS;
 
   const handleNavClick = (e: React.MouseEvent<HTMLElement>, href: string) => {
     if (href.startsWith("/#") && pathname === "/") {
@@ -85,28 +141,11 @@ function Navbar() {
       const el = document.getElementById(id);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "start" });
-
         window.history.replaceState(null, "", href);
       }
     }
     setMobileMenuOpen(false);
   };
-
-  const navLinks = isLoggedIn
-    ? [
-        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/interview", label: "Practice", icon: Target },
-        { href: "/recruiter", label: "Recruiter", icon: Building2 },
-        { href: "/sessions", label: "My Sessions", icon: BarChart3 },
-        { href: "/readiness", label: "Readiness", icon: Gauge },
-        { href: "/arena", label: "Arena", icon: Swords },
-        { href: "/settings", label: "Settings", icon: Settings },
-      ]
-    : [
-        { href: "/#features", label: "Features", icon: Sparkles },
-        { href: "/#how-it-works", label: "How It Works", icon: Search },
-        { href: "/#domains", label: "Domains", icon: Puzzle },
-      ];
 
   // Two items can share a destination, so highlight by position rather than by
   // href — otherwise both would read as current at the same time.
@@ -119,6 +158,14 @@ function Navbar() {
       .join("")
       .toUpperCase() || "U";
   const firstName = (user?.name || "User").split(" ")[0];
+
+  // Role badge color
+  const ROLE_BADGE: Record<string, string> = {
+    Administrator: "bg-destructive/10 text-destructive border border-destructive/20",
+    Mentor:        "bg-chart-5/10 text-chart-5 border border-chart-5/20",
+    Student:       "bg-primary/10 text-primary border border-primary/20",
+  };
+  const roleBadgeClass = role ? ROLE_BADGE[role] : ROLE_BADGE.Student;
 
   return (
     <nav
@@ -166,9 +213,16 @@ function Navbar() {
                   <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
                     {initials}
                   </span>
-                  <span className="text-sm font-medium text-foreground">
-                    Hi, {firstName}
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-foreground leading-tight">
+                      Hi, {firstName}
+                    </span>
+                    {role && (
+                      <span className={cn("rounded px-1 text-[10px] font-semibold leading-tight", roleBadgeClass)}>
+                        {role}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <Button variant="outline" size="sm" onClick={logout}>
                   Log Out
@@ -207,7 +261,7 @@ function Navbar() {
         className={cn(
           "overflow-hidden border-t border-border transition-all duration-200 ease-in-out md:hidden",
           mobileMenuOpen
-            ? "max-h-[28rem] opacity-100"
+            ? "max-h-[30rem] opacity-100"
             : "max-h-0 border-t-0 opacity-0",
         )}
       >
@@ -248,6 +302,11 @@ function Navbar() {
                     <span className="truncate text-xs text-muted-foreground">
                       {user?.email}
                     </span>
+                    {role && (
+                      <span className={cn("mt-0.5 w-fit rounded px-1.5 py-0.5 text-[10px] font-semibold", roleBadgeClass)}>
+                        {role}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <Button variant="outline" className="w-full" onClick={logout}>

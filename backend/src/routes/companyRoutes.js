@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../middleware/authMiddleware");
+const { requirePermission } = require("../middleware/rbacMiddleware");
 const {
   getCompanies,
   getCompanySessions,
@@ -9,11 +10,13 @@ const {
 
 router.use(authMiddleware);
 
-router.get("/", getCompanies);
+// Company profiles are part of the AI Recruiter Simulator — a student feature.
+// interview.read is shared with mentors so they can review simulator sessions.
+router.get("/",          requirePermission("interview.read"), getCompanies);
 
-// Must be declared before "/:slug", or Express matches this as a slug.
-router.get("/sessions", getCompanySessions);
+// Must be declared before "/:slug", or Express matches "sessions" as a slug.
+router.get("/sessions",  requirePermission("interview.read"), getCompanySessions);
 
-router.get("/:slug", getCompany);
+router.get("/:slug",     requirePermission("interview.read"), getCompany);
 
 module.exports = router;

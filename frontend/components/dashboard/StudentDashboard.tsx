@@ -65,7 +65,6 @@ import { InterviewHistoryPanel } from "@/components/dashboard/InterviewHistoryPa
 import { ReadinessSummaryPanel } from "@/components/dashboard/ReadinessSummaryPanel";
 import { RecruiterPanel } from "@/components/dashboard/RecruiterPanel";
 import { ArenaPanel } from "@/components/dashboard/ArenaPanel";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 interface ResumeAnalysis {
   summary: string;
@@ -1012,4 +1011,3 @@ function MiniSparkline({ scores }: { scores: number[] }) {
   );
 }
 export default page;
-

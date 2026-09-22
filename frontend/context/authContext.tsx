@@ -18,6 +18,8 @@ import {
     setToken,
     StoredUser,
 } from "@/lib/auth";
+import { hasPermission as _hasPermission, Permission, Role, ROLE_HOME } from "@/lib/permissions";
+
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface AuthContextValue {
@@ -25,6 +27,9 @@ interface AuthContextValue {
     token: string | null;
     isLoading: boolean;
     isLoggedIn: boolean;
+    role: Role | null;
+    /** UI-only permission check — backend always enforces authoritatively. */
+    hasPermission: (permission: Permission) => boolean;
     login: (email: string, password: string) => Promise<void>;
     register: (name: string, email: string, password: string) => Promise<void>;
     logout: () => Promise<void>;
@@ -42,7 +47,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [token, setTokenState] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true); // true on first load
 
-    // Hydrate from localStorage on mount
+    // Hydrate from localStorage on mount.
+    // If the cached user has no role (pre-RBAC session), refresh from the API.
     useEffect(() => {
         const storedToken = getToken();
         const storedUser = getStoredUser();
@@ -50,10 +56,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (storedToken && storedUser) {
             setTokenState(storedToken);
             setUser(storedUser);
+
+            // Stale cache (logged in before RBAC was added) — refresh silently
+            if (!storedUser.role) {
+                axiosInstance
+                    .get("/api/auth/me")
+                    .then(({ data }) => {
+                        setStoredUser(data.user);
+                        setUser(data.user);
+                    })
+                    .catch(() => {
+                        // Token expired / revoked — clean up
+                        clearAuth();
+                        setTokenState(null);
+                        setUser(null);
+                    })
+                    .finally(() => setIsLoading(false));
+                return; // setIsLoading will be called in finally above
+            }
         }
 
         setIsLoading(false);
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
 
     // ── Login ──────────────────────────────────────────────────────────────────
     const login = useCallback(
@@ -70,13 +95,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setTokenState(data.token);
                 setUser(data.user);
 
-                router.push("/dashboard");
+                // Redirect to role-specific home page
+                const userRole = (data.user?.role ?? "Student") as Role;
+                const destination = ROLE_HOME[userRole] ?? "/dashboard";
+                router.push(destination);
             } finally {
                 setIsLoading(false);
             }
         },
         [router],
     );
+
 
     // ── Register ───────────────────────────────────────────────────────────────
     const register = useCallback(
@@ -130,18 +159,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     }, [logout]);
 
+    // ── Role & permission helpers ──────────────────────────────────────────────
+    const role = (user?.role ?? null) as Role | null;
+
+    const hasPermission = useCallback(
+        (permission: Permission): boolean => {
+            return _hasPermission(role, permission);
+        },
+        [role],
+    );
+
     const value = useMemo<AuthContextValue>(
         () => ({
             user,
             token,
             isLoading,
             isLoggedIn: !!token && !!user,
+            role,
+            hasPermission,
             login,
             register,
             logout,
             refreshUser,
         }),
-        [user, token, isLoading, login, register, logout, refreshUser],
+        [user, token, isLoading, role, hasPermission, login, register, logout, refreshUser],
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
