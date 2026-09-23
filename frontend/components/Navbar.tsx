@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/Logo";
@@ -42,22 +42,21 @@ import {
 const STUDENT_LINKS = [
   { href: "/dashboard",  label: "Dashboard",   icon: LayoutDashboard },
   { href: "/interview",  label: "Practice",     icon: Target },
-  { href: "/recruiter",  label: "Recruiter",    icon: Building2 },
   { href: "/sessions",   label: "My Sessions",  icon: BarChart3 },
+  { href: "/recruiter",  label: "Recruiter",    icon: Building2 },
   { href: "/readiness",  label: "Readiness",    icon: Gauge },
   { href: "/arena",      label: "Arena",        icon: Swords },
 ];
 
 const MENTOR_LINKS = [
-  { href: "/mentor",   label: "Dashboard",    icon: LayoutDashboard },
-  { href: "/mentor",   label: "My Students",  icon: Users },
+  { href: "/mentor?tab=dashboard",   label: "Dashboard",    icon: LayoutDashboard },
+  { href: "/mentor?tab=students",    label: "My Students",  icon: Users },
 ];
 
 const ADMIN_LINKS = [
-  { href: "/admin",            label: "Dashboard",  icon: LayoutDashboard },
-  { href: "/admin",            label: "Admin",       icon: ShieldCheck },
-  { href: "/admin/users",      label: "Users",       icon: Users },
-  { href: "/admin/analytics",  label: "Analytics",   icon: LineChart },
+  { href: "/admin?tab=dashboard",    label: "Dashboard",  icon: LayoutDashboard },
+  { href: "/admin?tab=users",        label: "Users",       icon: Users },
+  { href: "/admin?tab=analytics",    label: "Analytics",   icon: LineChart },
 ];
 
 const PUBLIC_LINKS = [
@@ -68,11 +67,17 @@ const PUBLIC_LINKS = [
 
 function Navbar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { user, isLoggedIn, logout, role } = useAuth();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 50);
@@ -110,9 +115,34 @@ function Navbar() {
   }, [pathname]);
 
   const isActive = (path: string) => {
+    // If it's a hash link on the homepage
     if (path.startsWith("/#")) {
       return pathname === "/" && activeSection === path.replace("/#", "");
     }
+    
+    // Check path with query parameters if present
+    const [basePath, queryStr] = path.split("?");
+    if (queryStr) {
+      const targetParams = new URLSearchParams(queryStr);
+      const isCorrectPath = pathname === basePath || pathname.startsWith(basePath + "/");
+      let matchesAllParams = true;
+      for (const [key, val] of targetParams.entries()) {
+        if (searchParams.get(key) !== val) {
+          matchesAllParams = false;
+          break;
+        }
+      }
+      // Special case: if tab=dashboard, we consider it active if the query param is exactly "dashboard"
+      // or if it's completely missing (which defaults to dashboard).
+      if (basePath === "/mentor" && targetParams.get("tab") === "dashboard" && !searchParams.has("tab")) {
+         return pathname === basePath;
+      }
+      if (basePath === "/admin" && targetParams.get("tab") === "dashboard" && !searchParams.has("tab")) {
+         return pathname === basePath;
+      }
+      return isCorrectPath && matchesAllParams;
+    }
+
     if (path === "/sessions") {
       return pathname === path || pathname.startsWith("/sessions/");
     }
@@ -128,12 +158,6 @@ function Navbar() {
     if (path === "/admin") {
       return pathname === "/admin";
     }
-    if (path === "/admin/users") {
-      return pathname === "/admin/users" || pathname.startsWith("/admin/users/");
-    }
-    if (path === "/admin/analytics") {
-      return pathname === "/admin/analytics";
-    }
     if (path === "/mentor") {
       return pathname === "/mentor" || pathname.startsWith("/mentor/");
     }
@@ -141,7 +165,8 @@ function Navbar() {
   };
 
   // Resolve nav links based on role
-  const navLinks = !isLoggedIn
+  // Default to PUBLIC_LINKS during SSR to prevent hydration mismatch.
+  const navLinks = (!mounted || !isLoggedIn)
     ? PUBLIC_LINKS
     : role === "Administrator"
     ? ADMIN_LINKS
@@ -201,7 +226,7 @@ function Navbar() {
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
-          <Logo href={isLoggedIn ? (ROLE_HOME[role as keyof typeof ROLE_HOME] ?? "/dashboard") : "/"} />
+          <Logo href={(mounted && isLoggedIn) ? (ROLE_HOME[role as keyof typeof ROLE_HOME] ?? "/dashboard") : "/"} />
 
           {/* Desktop nav links */}
           <div className="hidden items-center gap-0.5 md:flex">
@@ -230,7 +255,7 @@ function Navbar() {
 
           {/* Desktop right side */}
           <div className="hidden items-center gap-2 md:flex">
-            {isLoggedIn ? (
+            {(mounted && isLoggedIn) ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -351,7 +376,7 @@ function Navbar() {
           })}
 
           <div className="mt-2 border-t border-border pt-3">
-            {isLoggedIn ? (
+            {(mounted && isLoggedIn) ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-2.5 px-1">
                   <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">

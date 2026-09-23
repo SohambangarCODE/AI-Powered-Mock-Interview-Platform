@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "../components/Navbar";
 import { AuthProvider } from "@/context/authContext";
+import { Suspense } from "react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,7 +28,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body suppressHydrationWarning>
         <AuthProvider>
-          <Navbar />
+          <Suspense fallback={<div className="h-16 border-b border-border bg-background" />}>
+            <Navbar />
+          </Suspense>
           <main className="pt-16">
             {children}
           </main>
