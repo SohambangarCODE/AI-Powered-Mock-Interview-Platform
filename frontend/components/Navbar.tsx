@@ -7,6 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { ROLE_HOME } from "@/lib/permissions";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Menu,
   X,
@@ -24,9 +33,12 @@ import {
   MessageSquare,
   LineChart,
   ShieldCheck,
+  ChevronDown,
+  LogOut,
 } from "lucide-react";
 
 // ── Role-based nav link definitions ──────────────────────────────────────────
+// Settings / Feedback / Log Out live in the profile dropdown now, not here.
 const STUDENT_LINKS = [
   { href: "/dashboard",  label: "Dashboard",   icon: LayoutDashboard },
   { href: "/interview",  label: "Practice",     icon: Target },
@@ -34,21 +46,18 @@ const STUDENT_LINKS = [
   { href: "/sessions",   label: "My Sessions",  icon: BarChart3 },
   { href: "/readiness",  label: "Readiness",    icon: Gauge },
   { href: "/arena",      label: "Arena",        icon: Swords },
-  { href: "/settings",   label: "Settings",     icon: Settings },
 ];
 
 const MENTOR_LINKS = [
-  { href: "/dashboard",  label: "Dashboard",   icon: LayoutDashboard },
-  { href: "/mentor",     label: "My Students",  icon: Users },
-  { href: "/settings",   label: "Settings",     icon: Settings },
+  { href: "/mentor",   label: "Dashboard",    icon: LayoutDashboard },
+  { href: "/mentor",   label: "My Students",  icon: Users },
 ];
 
 const ADMIN_LINKS = [
-  { href: "/dashboard",        label: "Dashboard",  icon: LayoutDashboard },
+  { href: "/admin",            label: "Dashboard",  icon: LayoutDashboard },
   { href: "/admin",            label: "Admin",       icon: ShieldCheck },
   { href: "/admin/users",      label: "Users",       icon: Users },
   { href: "/admin/analytics",  label: "Analytics",   icon: LineChart },
-  { href: "/settings",         label: "Settings",    icon: Settings },
 ];
 
 const PUBLIC_LINKS = [
@@ -110,6 +119,12 @@ function Navbar() {
     if (path === "/arena") {
       return pathname === path || pathname.startsWith("/arena/");
     }
+    if (path === "/recruiter") {
+      return pathname === path || pathname.startsWith("/recruiter/");
+    }
+    if (path === "/feedback") {
+      return pathname === path || pathname.startsWith("/feedback/");
+    }
     if (path === "/admin") {
       return pathname === "/admin";
     }
@@ -134,6 +149,9 @@ function Navbar() {
     ? MENTOR_LINKS
     : STUDENT_LINKS;
 
+  // Feedback only makes sense for students; keep it out of the dropdown for other roles.
+  const showFeedback = isLoggedIn && role !== "Administrator" && role !== "Mentor";
+
   const handleNavClick = (e: React.MouseEvent<HTMLElement>, href: string) => {
     if (href.startsWith("/#") && pathname === "/") {
       e.preventDefault();
@@ -150,6 +168,11 @@ function Navbar() {
   // Two items can share a destination, so highlight by position rather than by
   // href — otherwise both would read as current at the same time.
   const activeIndex = navLinks.findIndex((link) => isActive(link.href));
+
+  // Account-area pages (settings/feedback) now live in the dropdown, so the
+  // trigger itself needs to show "current" state for them.
+  const isAccountActive =
+    isActive("/settings") || (showFeedback && isActive("/feedback"));
 
   const initials =
     (user?.name || "U")
@@ -178,7 +201,7 @@ function Navbar() {
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
-          <Logo href={isLoggedIn ? "/dashboard" : "/"} />
+          <Logo href={isLoggedIn ? (ROLE_HOME[role as keyof typeof ROLE_HOME] ?? "/dashboard") : "/"} />
 
           {/* Desktop nav links */}
           <div className="hidden items-center gap-0.5 md:flex">
@@ -208,26 +231,65 @@ function Navbar() {
           {/* Desktop right side */}
           <div className="hidden items-center gap-2 md:flex">
             {isLoggedIn ? (
-              <>
-                <div className="flex items-center gap-2.5 rounded-full border border-border bg-muted/50 py-1 pr-3 pl-1">
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
-                    {initials}
-                  </span>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-foreground leading-tight">
-                      Hi, {firstName}
-                    </span>
-                    {role && (
-                      <span className={cn("rounded px-1 text-[10px] font-semibold leading-tight", roleBadgeClass)}>
-                        {role}
-                      </span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-full border py-1 pr-2.5 pl-1 outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50",
+                      isAccountActive
+                        ? "border-primary/30 bg-primary/10"
+                        : "border-border bg-muted/50 hover:bg-muted",
                     )}
-                  </div>
-                </div>
-                <Button variant="outline" size="sm" onClick={logout}>
-                  Log Out
-                </Button>
-              </>
+                  >
+                    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+                      {initials}
+                    </span>
+                    <div className="flex flex-col items-start">
+                      <span className="text-sm font-medium text-foreground leading-tight">
+                        Hi, {firstName}
+                      </span>
+                      {role && (
+                        <span className={cn("rounded px-1 text-[10px] font-semibold leading-tight", roleBadgeClass)}>
+                          {role}
+                        </span>
+                      )}
+                    </div>
+                    <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-foreground">{user?.name || "User"}</span>
+                      <span className="truncate text-xs text-muted-foreground">{user?.email}</span>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings" className="flex items-center gap-2 cursor-pointer">
+                      <Settings className="size-4" aria-hidden />
+                      Settings
+                    </Link>
+                  </DropdownMenuItem>
+                  {showFeedback && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/feedback" className="flex items-center gap-2 cursor-pointer">
+                        <MessageSquare className="size-4" aria-hidden />
+                        Feedback
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={logout}
+                    className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+                  >
+                    <LogOut className="size-4" aria-hidden />
+                    Log Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
               <>
                 <Button variant="ghost" size="sm" asChild>
@@ -261,7 +323,7 @@ function Navbar() {
         className={cn(
           "overflow-hidden border-t border-border transition-all duration-200 ease-in-out md:hidden",
           mobileMenuOpen
-            ? "max-h-[30rem] opacity-100"
+            ? "max-h-[36rem] opacity-100"
             : "max-h-0 border-t-0 opacity-0",
         )}
       >
@@ -309,6 +371,39 @@ function Navbar() {
                     )}
                   </div>
                 </div>
+
+                {/* Account actions, grouped under the profile — same items as the desktop dropdown */}
+                <div className="space-y-1">
+                  <Link
+                    href="/settings"
+                    onClick={(e) => handleNavClick(e, "/settings")}
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                      isActive("/settings")
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    <Settings className="size-4" aria-hidden />
+                    Settings
+                  </Link>
+                  {showFeedback && (
+                    <Link
+                      href="/feedback"
+                      onClick={(e) => handleNavClick(e, "/feedback")}
+                      className={cn(
+                        "flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                        isActive("/feedback")
+                          ? "bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                      )}
+                    >
+                      <MessageSquare className="size-4" aria-hidden />
+                      Feedback
+                    </Link>
+                  )}
+                </div>
+
                 <Button variant="outline" className="w-full" onClick={logout}>
                   Log Out
                 </Button>

@@ -15,6 +15,8 @@ const companyRoutes = require("./routes/companyRoutes");
 const arenaRoutes = require("./routes/arenaRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const mentorRoutes = require("./routes/mentorRoutes");
+const feedbackRoutes = require("./routes/feedbackRoutes");
+const { seedDailyChallenges, seedWeeklyChallenges } = require("./controllers/arenaController");
 
 const app = express();
 
@@ -104,6 +106,7 @@ app.use("/api/companies",  ensureDatabaseConnection, companyRoutes);
 app.use("/api/arena",      ensureDatabaseConnection, arenaRoutes);
 app.use("/api/admin",      ensureDatabaseConnection, adminRoutes);
 app.use("/api/mentor",     ensureDatabaseConnection, mentorRoutes);
+app.use("/api/feedback",   ensureDatabaseConnection, feedbackRoutes);
 
 /* -------------------- Error Handler ----------------------------------------- */
 
@@ -124,6 +127,21 @@ app.use((err, req, res, next) => {
     message: "Internal server error",
   });
 });
+
+/* -------------------- Arena Challenge Seeding -------------------------------- */
+// Non-blocking: seed today's daily challenges and this week's weekly challenges
+// on every cold start. If they already exist the seed is a no-op (idempotent).
+// Failures are logged and tolerated — the arena still works once seeds exist.
+connectDB()
+  .then(() => Promise.all([seedDailyChallenges(), seedWeeklyChallenges()]))
+  .then(([daily, weekly]) => {
+    console.log(
+      `Arena challenges seeded — daily: ${daily.created} new, weekly: ${weekly.created} new`,
+    );
+  })
+  .catch((error) => {
+    console.error("Arena challenge seed failed:", error.message);
+  });
 
 /* -------------------- Vercel Export ----------------------------------------- */
 

@@ -538,23 +538,36 @@ const TABS = [
 
 const page = () => {
   const router = useRouter();
-  const { isLoggedIn, isLoading: authLoading, user } = useAuth();
+  const { isLoggedIn, isLoading: authLoading, user, role } = useAuth();
   const [ShowDomainSelector, setShowDomainSelector] = useState(false);
   const [filterDomain, setFilterDomain] = useState<string>("All");
   const [activeTab, setActiveTab] = useState<
-    "history" | "recruiter" | "readiness" | "resume" | "arena"
+    "history" | "recruiter" | "readiness" | "resume" | "arena" | "security"
   >("history");
 
+  // Only fire student-specific hooks when role is confirmed as Student.
+  // While authLoading is true we haven't resolved role yet; once resolved,
+  // non-student roles are redirected away before the hooks can make requests.
+  const isStudent = role === "Student" || (authLoading && !role);
+
   const { interviews, activeSessions, dataLoading } =
-    useInterviewHistory(isLoggedIn);
-  const readiness = useReadiness(isLoggedIn && activeTab === "readiness");
-  const recruiter = useRecruiter(isLoggedIn && activeTab === "recruiter");
+    useInterviewHistory(isLoggedIn && isStudent);
+  const readiness = useReadiness(isLoggedIn && isStudent && activeTab === "readiness");
+  const recruiter = useRecruiter(isLoggedIn && isStudent && activeTab === "recruiter");
 
   useEffect(() => {
-    if (!authLoading && !isLoggedIn) {
+    if (authLoading) return;
+    if (!isLoggedIn) {
       router.push("/login");
+      return;
     }
-  }, [isLoggedIn, authLoading, router]);
+    // Redirect non-student roles to their own home page.
+    if (role === "Mentor") {
+      router.replace("/mentor");
+    } else if (role === "Administrator") {
+      router.replace("/admin");
+    }
+  }, [isLoggedIn, authLoading, role, router]);
 
   const handleSelectDomain = (domain: string) => {
     router.push(`/interview?domain=${encodeURIComponent(domain)}`);
@@ -567,6 +580,14 @@ const page = () => {
     );
   }
   if (!isLoggedIn) return null;
+  // Show spinner while redirect is in flight for non-student roles.
+  if (role && role !== "Student") {
+    return (
+      <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center bg-background">
+        <LoadingState label="Redirecting…" />
+      </div>
+    );
+  }
 
   const avgScore = interviews.length
     ? Math.round(
